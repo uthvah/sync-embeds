@@ -1,0 +1,84 @@
+/* Main container for the sync block */
+.sync-container {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--background-primary);
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Individual embed container */
+.sync-embed {
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* --- SEAMLESS STYLING FOR EMBEDDED EDITOR --- */
+
+/* Hide the view's header (title bar, icons) completely */
+.sync-embed .view-header {
+  display: none !important;
+}
+
+/* Make the main content area and editor background transparent */
+.sync-embed .view-content,
+.sync-embed .markdown-source-view,
+.sync-embed .cm-editor,
+.sync-embed .cm-scroller {
+  background-color: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Ensure the editor itself takes up the full width */
+.sync-embed .markdown-source-view.mod-cm6 .cm-editor {
+    width: 100%;
+}
+
+/* Remove padding from the view content area */
+.sync-embed .view-content {
+  padding: 0 var(--file-margins) !important;
+}
+
+/* Remove extra vertical padding from CodeMirror */
+.sync-embed .cm-s-obsidian .cm-gutters,
+.sync-embed .cm-s-obsidian .cm-content {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* Optional: remove line numbers */
+.sync-embed .cm-gutters {
+    display: none;
+}
+.sync-embed .cm-content {
+    padding-left: 0 !important;
+}
+
+/* --- UTILITY & ERROR STYLING --- */
+
+.sync-embed-gap {
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border-hover);
+}
+
+.sync-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.sync-embed-error {
+  padding: 8px 12px;
+  background: var(--background-modifier-error);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  color: var(--text-error);
+}
