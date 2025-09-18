@@ -74,21 +74,15 @@ module.exports = class SyncEmbedPlugin extends Plugin {
                 return;
             }
 
-            // --- SECTION LOGIC ---
             if (section) {
                 let fullContent = await this.app.vault.read(file);
                 const sectionContent = this.extractSection(fullContent, section);
                 view.editor.setValue(sectionContent);
 
-                // --- THE FIX ---
-                // Disconnect the view from the file to prevent Obsidian's native
-                // auto-save from overwriting the entire note with just the section.
                 view.file = null;
-                // ---------------
 
                 const debouncedSave = debounce(async () => {
                     const newSectionText = view.editor.getValue();
-                    // We must re-read the file right before saving to get the latest version.
                     const currentFullContent = await this.app.vault.read(file);
                     const newFullContent = this.replaceSection(currentFullContent, section, newSectionText);
 
@@ -97,7 +91,6 @@ module.exports = class SyncEmbedPlugin extends Plugin {
                     }
                 }, 500, true);
 
-                // Register the save function on editor changes for this specific view
                 component.registerEvent(this.app.workspace.on('editor-change', (editor) => {
                     if (editor === view.editor) {
                         debouncedSave();
