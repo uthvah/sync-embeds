@@ -1,10 +1,3 @@
-/* 
- * styles.css for Sync Embeds Plugin
- * 
- * This file handles the visual presentation of the synced embed blocks,
- * aiming for a seamless and native look and feel.
- */
-
 /* Main container for a ```sync``` code block */
 .sync-container {
   border: 1px solid var(--background-modifier-border);
@@ -14,12 +7,11 @@
   margin: 12px 0;
   display: flex;
   flex-direction: column;
-  gap: 16px; /* Provides consistent spacing between multiple embeds */
+  gap: 16px;
 }
 
 /* Wrapper for a single `![[...]]` embed inside the container */
 .sync-embed {
-  /* Reset any default styling that might interfere */
   border: none !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -28,14 +20,10 @@
 }
 
 /* --- SEAMLESS STYLING FOR THE EMBEDDED EDITOR --- */
-/* This is the most critical section for the "native" feel. */
-
-/* Hide the view's header (which contains the title, icons, etc.) */
 .sync-embed .view-header {
   display: none !important;
 }
 
-/* Make the main content area and editor background transparent to blend in. */
 .sync-embed .view-content,
 .sync-embed .markdown-source-view,
 .sync-embed .cm-editor,
@@ -45,36 +33,46 @@
   margin: 0 !important;
 }
 
-/* Ensure the editor itself takes up the full width of its container */
 .sync-embed .markdown-source-view.mod-cm6 .cm-editor {
   width: 100%;
 }
 
-/* 
- * Remove the default padding from the view content area.
- * This aligns the text inside the embed with the text of the parent note.
- */
 .sync-embed .view-content {
   padding: 0 var(--file-margins) !important;
 }
 
-/* Adjust vertical padding inside the editor */
 .sync-embed .cm-s-obsidian .cm-gutters,
 .sync-embed .cm-s-obsidian .cm-content {
   padding-top: 0 !important;
-  /* --- NEW --- Add a space at the bottom of the embed for better visual separation */
-  padding-bottom: 1em !important; 
+  padding-bottom: 1em !important;
+}
+
+/* --- STAGE 2 FIXES --- */
+/*
+ * Make the inline title visible and not greyed out.
+ */
+.sync-embed .inline-title {
+  pointer-events: none; /* Disables all clicks, focus, and hover */
+  user-select: none;    /* Prevents the user from selecting the text */
+  opacity: 1;         /* Restores the default text color */
+}
+
+/*
+ * Make the header in a section embed uneditable.
+ */
+.uneditable-header {
+    pointer-events: none !important;
+    user-select: none !important;
+    opacity: 0.7 !important;
+    background-color: transparent !important;
 }
 
 /* --- UTILITY & ERROR STATE STYLING --- */
-
-/* Provides a visual separator line for multiple embeds if the 'gap' isn't enough */
 .sync-embed-gap {
   padding-top: 16px;
   border-top: 1px solid var(--background-modifier-border-hover);
 }
 
-/* Style for when a sync block is empty */
 .sync-empty {
   padding: 20px;
   text-align: center;
@@ -82,7 +80,6 @@
   font-style: italic;
 }
 
-/* Style for when an embed fails to load (e.g., note not found) */
 .sync-embed-error {
   padding: 8px 12px;
   background: var(--background-modifier-error);
