@@ -1,49 +1,87 @@
-# Sync Embeds for Obsidian
+<div align="center">
 
-A simple, powerful plugin to create fully editable, live-synced note embeds. Edit your notes from anywhere, seamlessly.
+# ✨ Sync Embeds for Obsidian
 
-![sync-embeds](https://github.com/user-attachments/assets/602671d5-127b-401e-8025-dfea783af134)
+### The missing Notion-style synced block for Obsidian.
+
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/uthvah/sync-embeds?style=for-the-badge)](https://github.com/uthvah/sync-embeds/releases/latest)
+[![MIT License](https://img.shields.io/github/license/uthvah/sync-embeds?style=for-the-badge)](https://github.com/uthvah/sync-embeds/blob/main/LICENSE)
+
+</div>
 
 ---
 
-## Features
+**Sync Embeds** transforms standard Obsidian embeds into live, two-way synced blocks. Edit any note or section directly from where you embed it, without ever needing to open the source file.
 
--   **Truly Native Editing**: Embeds are not a simulation. They are the actual Obsidian editor, so everything from syntax highlighting to inline rendering works as expected.
--   **Live Two-Way Sync**: Changes made in an embed are instantly reflected in the original note, and vice-versa.
--   **Seamless Look & Feel**: Embeds blend perfectly into your notes with no distracting borders or titles.
--   **Simple to Use**: Just place a note link inside a `sync` code block.
+It's designed to feel seamless, stable, and completely native to the Obsidian experience.
 
-## How to Use
+![syncembed](https://github.com/user-attachments/assets/683ed4ad-c492-4df3-b7f1-cf948bd2aa80)
 
-There are two ways to create a synced embed:
+> *Edit any embed, anywhere, and have it instantly save to the original note.*
 
-### 1. Manual Method
+## Core Features
 
-Wrap one or more standard Obsidian embeds inside a `sync` code block.
+*   🔄 **Live Two-Way Syncing:** Edit an embed and see the changes reflected in the source note instantly. No more context switching.
+*   ⌨️ **Full Keyboard Shortcut Support:** The #1 limitation is solved. Use all your familiar hotkeys for checkboxes, formatting, lists, and more, directly within an embed.
+*   🎯 **Embed Specific Sections:** Isolate and edit just a single header section from a note using the standard `![[My Note#My Header]]` syntax. Perfect for managing tasks or project sections from a central dashboard.
+*   🚀 **Lightweight & Stable:** Built from the ground up to be robust, with a focus on stability and a seamless user experience.
 
-````markdown
-```sync
-![[My Note To Edit]]
-![[Another Note]]
-```
-````
+## How it Works
 
-The code block will be replaced with a live, editable version of "My Note To Edit" and "Another Note".
+Instead of just rendering the content, Sync Embeds creates a hidden, fully functional editor pane for the source note. It then cleverly re-parents the visual part of that editor directly into your current document. This means you are interacting with a real editor instance, providing a truly native feel.
 
-### 2. Command Palette
-
-1.  Open the Command Palette (`Ctrl+P` or `Cmd+P`).
-2.  Search for **"Sync Embeds: Insert synced embed"**.
-3.  A `sync` block will be inserted at your cursor's position. If you have text selected, it will be used as the note name.
-
-## Important Limitation: Keyboard Shortcuts
-
-Please be aware that most keyboard shortcuts and editor commands **will not work** when you are focused on a synced embed.
-
-**Why?** Obsidian's commands and hotkeys are tied to the main "active" editor pane. When you are editing an embed, the parent note is still considered the active file. This is a technical limitation of how embedded editors work within the app.
-
-Basic text editing, typing, and selection work perfectly.
+---
 
 ## Installation
 
-Copy over main.js, manifest.json and styles.css from the latest release to your vault @ VaultFolder/.obsidian/plugins/sync-embeds/.
+### From Community Plugins (Recommended)
+
+_Coming Soon! This plugin is currently awaiting review to be added to the official Community Plugins browser._
+
+### Using BRAT (Beta)
+
+1.  Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin from the Community Plugins browser.
+2.  In Obsidian, go to `Settings` -> `BRAT` -> `Add Beta plugin`.
+3.  Enter `uthvah/sync-embeds` as the repository.
+4.  BRAT will install the plugin. Enable it under `Settings` -> `Community plugins`.
+
+### Manual Installation
+
+1.  Go to the [latest release](https://github.com/uthvah/sync-embeds/releases/latest).
+2.  Download the `main.js`, `manifest.json`, and `styles.css` files.
+3.  In your Obsidian vault, navigate to `.obsidian/plugins/`.
+4.  Create a new folder named `sync-embeds`.
+5.  Copy the downloaded files into this new folder.
+6.  Restart Obsidian, then enable the plugin under `Settings` -> `Community plugins`.
+
+---
+
+## Usage
+
+Using Sync Embeds is simple. Just wrap your standard embed syntax inside a `sync` code block.
+
+#### 1. Create a Synced Block
+
+Use the `sync` code block language identifier:
+
+```sync
+![[My Note To Edit]]
+```
+
+2. Embed a Specific Section
+
+You can also embed just a single header section:
+
+```sync
+![[My Note To Edit#A Specific Heading]]
+```
+
+The content within this block will now be a live, editable instance of the source note or section.
+
+## Philosophy
+
+The goal of Sync Embeds is to make your notes more dynamic and interconnected. It removes the friction of editing transcluded content, allowing you to build powerful dashboards, manage recurring tasks, and maintain a single source of truth for blocks of information without ever leaving the note you're working on.
+
+## Contributing & Feedback
+
+This plugin was built with and for the community. If you find a bug, have a feature idea, or want to contribute, please feel free to open an issue or submit a pull request!
