@@ -28,7 +28,7 @@ It's designed to feel seamless, stable, and completely native to the Obsidian ex
 
 ## How it Works
 
-Instead of just rendering the content, Sync Embeds creates a hidden, fully functional editor pane for the source note. It then cleverly re-parents the visual part of that editor directly into your current document. This means you are interacting with a real editor instance, providing a truly native feel.
+Instead of just rendering the content, Sync Embeds creates a hidden, fully functional editor pane for the source note. It then re-parents the visual part of that editor directly into your current document. This means you are interacting with a real editor instance, providing a truly native feel.
 
 ---
 
