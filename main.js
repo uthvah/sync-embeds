@@ -1,23 +1,46 @@
-const { Plugin, MarkdownView, WorkspaceLeaf, Component, debounce } = require('obsidian');
+const { Plugin, MarkdownView } = require('obsidian');
+const { around } = require('monkey-around');
+const EmbedManager = require('./embed-manager');
+const CommandInterceptor = require('./command-interceptor');
+const SyncEmbedsSettingTab = require('./settings');
+
+const DEFAULT_SETTINGS = {
+    embedHeight: 'auto',
+    maxEmbedHeight: 'none',
+    collapsePropertiesByDefault: true,
+    showInlineTitle: true,
+    enableCommandInterception: true,
+    gapBetweenEmbeds: '16px',
+    lazyLoadThreshold: '100px',
+    showFocusHighlight: true,
+    showHeaderHints: true,           // NEW: Header hints (enforcement is always on)
+    debugMode: false
+};
 
 module.exports = class SyncEmbedPlugin extends Plugin {
     constructor(app, manifest) {
         super(app, manifest);
-        this.embedRegistry = new Map(); // Maps container elements to embed data
-        this.originalExecuteCommand = null;
-        this.originalGetActiveViewOfType = null;
-        this.commandInterceptors = new Map(); // Maps command IDs to our handlers
+        this.settings = DEFAULT_SETTINGS;
+        this.DEFAULT_SETTINGS = DEFAULT_SETTINGS; // Expose for settings tab
+        this.embedManager = null;
+        this.commandInterceptor = null;
         this.currentFocusedEmbed = null;
+        this.uninstallers = [];
     }
 
     async onload() {
-        console.log('Loading Sync Embeds Plugin - Command Interception Active');
+        await this.loadSettings();
         
-        this.hijackObsidianCommands();
+        // Initialize managers
+        this.embedManager = new EmbedManager(this);
+        this.commandInterceptor = new CommandInterceptor(this);
         
-        // Setup command interceptors for common shortcuts
-        this.setupCommandInterceptors();
+        // Setup command interception with monkey-around
+        if (this.settings.enableCommandInterception) {
+            this.setupCommandInterception();
+        }
 
+        // Register command to insert sync blocks
         this.addCommand({
             id: 'insert-synced-embed',
             name: 'Insert synced embed',
@@ -29,497 +52,243 @@ module.exports = class SyncEmbedPlugin extends Plugin {
             }
         });
 
-        this.registerMarkdownCodeBlockProcessor('sync', (source, el, ctx) => {
-            this.processSyncBlock(source, el, ctx);
+        // Register command to insert sync block with multiple embeds
+        this.addCommand({
+            id: 'insert-multi-synced-embed',
+            name: 'Insert sync block with multiple embeds',
+            editorCallback: (editor, view) => {
+                const textToInsert = `\`\`\`sync\n![[Note 1]]\n![[Note 2]]\n\`\`\``;
+                editor.replaceSelection(textToInsert);
+            }
         });
 
-        // Global event listeners to track focus
+        // Register command to insert dynamic date embed
+        this.addCommand({
+            id: 'insert-dynamic-date-embed',
+            name: 'Insert dynamic date embed (today)',
+            editorCallback: (editor, view) => {
+                const textToInsert = `\`\`\`sync\n![[Daily/{{date:YYYY-MM-DD}}|Today]]\n\`\`\``;
+                editor.replaceSelection(textToInsert);
+            }
+        });
+
+        // NEW: Register header commands
+        this.registerHeaderCommands();
+
+        // Register markdown code block processor
+        this.registerMarkdownCodeBlockProcessor('sync', (source, el, ctx) => {
+            this.embedManager.processSyncBlock(source, el, ctx);
+        });
+
+        // Global focus tracking
         this.registerDomEvent(document, 'focusin', this.trackFocus.bind(this));
         this.registerDomEvent(document, 'focusout', this.trackFocusLoss.bind(this));
+
+        // Add settings tab
+        this.addSettingTab(new SyncEmbedsSettingTab(this.app, this));
+        
+        // Apply focus highlight setting
+        this.updateFocusHighlight();
+        
+        // Log successful load
+        this.log('Sync Embeds plugin loaded successfully');
     }
 
     onunload() {
-        console.log('Unloading Sync Embeds Plugin');
-        this.restoreObsidianCommands();
-        this.embedRegistry.clear();
+        this.log('Unloading Sync Embeds plugin');
+        
+        // Clean up command interception
+        this.uninstallers.forEach(uninstall => uninstall());
+        this.uninstallers = [];
+        
+        // Clean up managers
+        if (this.embedManager) {
+            this.embedManager.cleanup();
+        }
+        
         this.currentFocusedEmbed = null;
     }
 
-    // HIJACK OBSIDIAN'S COMMAND SYSTEM
-    hijackObsidianCommands() {
-        this.originalExecuteCommand = this.app.commands.executeCommand;
-        this.originalGetActiveViewOfType = this.app.workspace.getActiveViewOfType;
+    registerHeaderCommands() {
+        const headerLevels = [
+            { level: 2, name: 'Heading 2', key: '2' },
+            { level: 3, name: 'Heading 3', key: '3' },
+            { level: 4, name: 'Heading 4', key: '4' },
+            { level: 5, name: 'Heading 5', key: '5' },
+            { level: 6, name: 'Heading 6', key: '6' },
+        ];
+        
+        headerLevels.forEach(({ level, name, key }) => {
+            this.addCommand({
+                id: `insert-header-${level}`,
+                name: `Toggle ${name}`,
+                editorCallback: (editor, view) => {
+                    // Check if we're in a sync embed
+                    const focusedEmbed = this.getFocusedEmbed();
+                    
+                    if (focusedEmbed) {
+                        // Use our custom handler
+                        const handler = this.commandInterceptor.insertHeaderCommand(level);
+                        return handler(focusedEmbed);
+                    }
+                    
+                    // Fall back to normal behavior for non-embed editing
+                    this.commandInterceptor.insertHeader({ editor }, level);
+                },
+                hotkeys: [
+                    {
+                        modifiers: ['Alt'],
+                        key: key
+                    }
+                ]
+            });
+        });
+        
+        this.log('Registered header commands with default hotkeys (Alt+2-6)');
+    }
 
-        // Override executeCommand to route to our embeds when appropriate
-        this.app.commands.executeCommand = (command, ...args) => {
-            const focusedEmbed = this.getFocusedEmbed();
+    setupCommandInterception() {
+        try {
+            // Patch executeCommand to intercept ALL commands for focused embeds
+            const executeCommandUninstall = around(this.app.commands, {
+                executeCommand: (old) => {
+                    const plugin = this;
+                    return function(command, ...args) {
+                        const focusedEmbed = plugin.getFocusedEmbed();
+                        
+                        // If embed is focused, check if we should intercept
+                        if (focusedEmbed) {
+                            // Check for our header commands first
+                            const headerMatch = command.id.match(/^sync-embeds:insert-header-(\d+)$/);
+                            if (headerMatch) {
+                                const level = parseInt(headerMatch[1]);
+                                plugin.log(`Intercepting header command: ${command.id}`);
+                                const handler = plugin.commandInterceptor.insertHeaderCommand(level);
+                                return handler(focusedEmbed);
+                            }
+                            
+                            // Check if we have a custom handler
+                            if (plugin.commandInterceptor.hasHandler(command.id)) {
+                                plugin.log(`Intercepting command: ${command.id}`);
+                                return plugin.commandInterceptor.handle(command.id, focusedEmbed, ...args);
+                            }
+                            
+                            // For commands we don't handle, let them execute on the embed's editor
+                            // This ensures ALL hotkeys work, including custom user-defined ones
+                            plugin.log(`Passing through command to embed: ${command.id}`);
+                            
+                            // Check if command has a callback that expects an editor
+                            if (command.editorCallback && focusedEmbed.editor) {
+                                try {
+                                    return command.editorCallback(focusedEmbed.editor, focusedEmbed.view);
+                                } catch (error) {
+                                    plugin.log(`Error executing command ${command.id} on embed:`, error);
+                                    // Fall through to normal execution
+                                }
+                            }
+                        }
+                        
+                        return old.call(this, command, ...args);
+                    };
+                }
+            });
+            this.uninstallers.push(executeCommandUninstall);
+
+            // Patch getActiveViewOfType to return embed view when focused
+            const getActiveViewUninstall = around(this.app.workspace, {
+                getActiveViewOfType: (old) => {
+                    const plugin = this;
+                    return function(type) {
+                        const focusedEmbed = plugin.getFocusedEmbed();
+                        if (focusedEmbed && focusedEmbed.view instanceof type) {
+                            plugin.log(`Returning embed view for type: ${type.name}`);
+                            return focusedEmbed.view;
+                        }
+                        return old.call(this, type);
+                    };
+                }
+            });
+            this.uninstallers.push(getActiveViewUninstall);
             
-            if (focusedEmbed && this.commandInterceptors.has(command.id)) {
-                // Route to our custom handler
-                const handler = this.commandInterceptors.get(command.id);
-                return handler.call(this, focusedEmbed, ...args);
-            }
+            // Patch getActiveViewOfType on workspace.activeLeaf as well
+            const getActiveLeafUninstall = around(this.app.workspace, {
+                activeLeaf: {
+                    get: (old) => {
+                        const plugin = this;
+                        return function() {
+                            const focusedEmbed = plugin.getFocusedEmbed();
+                            if (focusedEmbed && focusedEmbed.leaf) {
+                                plugin.log('Returning embed leaf as active leaf');
+                                return focusedEmbed.leaf;
+                            }
+                            return old.call(this);
+                        };
+                    }
+                }
+            });
+            this.uninstallers.push(getActiveLeafUninstall);
             
-            // Otherwise, use the default Obsidian behavior
-            return this.originalExecuteCommand.call(this.app.commands, command, ...args);
-        };
-
-        // Override getActiveViewOfType to make Obsidian think our embed is the active view
-        this.app.workspace.getActiveViewOfType = (type) => {
-            const focusedEmbed = this.getFocusedEmbed();
-            if (focusedEmbed && focusedEmbed.view instanceof type) {
-                return focusedEmbed.view;
-            }
-            return this.originalGetActiveViewOfType.call(this.app.workspace, type);
-        };
-    }
-
-    restoreObsidianCommands() {
-        if (this.originalExecuteCommand) {
-            this.app.commands.executeCommand = this.originalExecuteCommand;
-        }
-        if (this.originalGetActiveViewOfType) {
-            this.app.workspace.getActiveViewOfType = this.originalGetActiveViewOfType;
+            this.log('Command interception setup complete');
+        } catch (error) {
+            console.error('Sync Embeds: Failed to setup command interception:', error);
         }
     }
 
-    // SETUP COMMAND INTERCEPTORS
-    setupCommandInterceptors() {
-        const commandMappings = {
-            'editor:toggle-checklist-status': this.toggleChecklistCommand,
-            'editor:toggle-bold': this.toggleBoldCommand,
-            'editor:toggle-italics': this.toggleItalicCommand,
-            'editor:toggle-strikethrough': this.toggleStrikethroughCommand,
-            'editor:toggle-code': this.toggleCodeCommand,
-            'editor:insert-link': this.insertLinkCommand,
-            'editor:toggle-bullet-list': this.toggleBulletListCommand,
-            'editor:toggle-numbered-list': this.toggleNumberedListCommand,
-            'editor:indent-list': this.indentListCommand,
-            'editor:unindent-list': this.unindentListCommand,
-            'editor:insert-tag': this.insertTagCommand,
-            'editor:swap-line-up': this.swapLineUpCommand,
-            'editor:swap-line-down': this.swapLineDownCommand,
-            'editor:duplicate-line': this.duplicateLineCommand,
-            'editor:delete-line': this.deleteLineCommand
-        };
-
-        for (const [commandId, handler] of Object.entries(commandMappings)) {
-            this.commandInterceptors.set(commandId, handler);
-        }
-    }
-
-    // FOCUS TRACKING METHODS
+    // Focus tracking
     trackFocus(event) {
-        const embed = this.getEmbedFromElement(event.target);
+        const embed = this.embedManager.getEmbedFromElement(event.target);
         if (embed) {
             this.currentFocusedEmbed = embed;
+            this.log('Focus changed to embed:', embed.file?.basename);
         }
     }
 
     trackFocusLoss(event) {
-        const embed = this.getEmbedFromElement(event.relatedTarget);
+        const embed = this.embedManager.getEmbedFromElement(event.relatedTarget);
         if (!embed) {
+            this.log('Focus lost from embed');
             this.currentFocusedEmbed = null;
         }
     }
 
-    // UTILITY METHODS
     getFocusedEmbed() {
         return this.currentFocusedEmbed;
     }
 
-    getEmbedFromElement(element) {
-        if (!element) return null;
-        let current = element;
-        while (current && current !== document.body) {
-            if (current.classList && current.classList.contains('sync-embed')) {
-                return this.embedRegistry.get(current);
-            }
-            current = current.parentElement;
-        }
-        return null;
+    // Settings management
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     }
 
-    // COMMAND IMPLEMENTATIONS
-    toggleChecklistCommand(embedData) {
-        const { editor } = embedData;
-        const cursor = editor.getCursor();
-        const line = editor.getLine(cursor.line);
+    async saveSettings() {
+        await this.saveData(this.settings);
+        this.refreshAllEmbeds();
+        this.updateFocusHighlight();
+    }
 
-        if (line.match(/^\s*- \[ \]/)) {
-            editor.replaceRange(line.replace(/- \[ \]/, '- [x]'), {line: cursor.line, ch: 0}, {line: cursor.line, ch: line.length});
-        } else if (line.match(/^\s*- \[x\]/i)) {
-            editor.replaceRange(line.replace(/- \[x\]/i, '- [ ]'), {line: cursor.line, ch: 0}, {line: cursor.line, ch: line.length});
+    updateFocusHighlight() {
+        if (this.settings.showFocusHighlight) {
+            document.body.removeClass('sync-embeds-no-focus-highlight');
         } else {
-            const indent = line.match(/^\s*/)[0];
-            const content = line.substring(indent.length);
-            editor.replaceRange(`${indent}- [ ] ${content}`, {line: cursor.line, ch: 0}, {line: cursor.line, ch: line.length});
-        }
-        return true;
-    }
-    
-    // Helper for toggling markdown formatting
-    toggleMarkdownFormatting(embedData, markdownChar) {
-        const { editor } = embedData;
-        const selection = editor.getSelection();
-        const len = markdownChar.length;
-
-        if (selection && selection.startsWith(markdownChar) && selection.endsWith(markdownChar)) {
-            editor.replaceSelection(selection.slice(len, -len));
-        } else if (selection) {
-            editor.replaceSelection(`${markdownChar}${selection}${markdownChar}`);
-        } else {
-            const cursor = editor.getCursor();
-            editor.replaceRange(markdownChar + markdownChar, cursor);
-            editor.setCursor({ line: cursor.line, ch: cursor.ch + len });
-        }
-        return true;
-    }
-    
-    toggleBoldCommand(embedData) { return this.toggleMarkdownFormatting(embedData, '**'); }
-    toggleItalicCommand(embedData) { return this.toggleMarkdownFormatting(embedData, '*'); }
-    toggleStrikethroughCommand(embedData) { return this.toggleMarkdownFormatting(embedData, '~~'); }
-    toggleCodeCommand(embedData) { return this.toggleMarkdownFormatting(embedData, '`'); }
-
-    insertLinkCommand(embedData) {
-        const { editor } = embedData;
-        const selection = editor.getSelection();
-        if (selection) {
-            editor.replaceSelection(`[[${selection}]]`);
-        } else {
-            const cursor = editor.getCursor();
-            editor.replaceRange('[[]]', cursor);
-            editor.setCursor({ line: cursor.line, ch: cursor.ch + 2 });
-        }
-        return true;
-    }
-
-    toggleBulletListCommand(embedData) {
-        const { editor } = embedData;
-        const cursor = editor.getCursor();
-        const line = editor.getLine(cursor.line);
-
-        if (line.match(/^\s*- /)) {
-            editor.replaceRange(line.replace(/^\s*- /, ''), {line: cursor.line, ch: 0}, {line: cursor.line, ch: line.length});
-        } else {
-            editor.replaceRange(`- ${line}`, {line: cursor.line, ch: 0}, {line: cursor.line, ch: line.length});
-        }
-        return true;
-    }
-
-    toggleNumberedListCommand(embedData) {
-        const { editor } = embedData;
-        const cursor = editor.getCursor();
-        const line = editor.getLine(cursor.line);
-
-        if (line.match(/^\s*\d+\. /)) {
-            editor.replaceRange(line.replace(/^\s*\d+\. /, ''), {line: cursor.line, ch: 0}, {line: cursor.line, ch: line.length});
-        } else {
-            editor.replaceRange(`1. ${line}`, {line: cursor.line, ch: 0}, {line: cursor.line, ch: line.length});
-        }
-        return true;
-    }
-
-    indentListCommand(embedData) {
-        const { editor } = embedData;
-        const cursor = editor.getCursor();
-        editor.replaceRange('\t', {line: cursor.line, ch: 0});
-        return true;
-    }
-
-    unindentListCommand(embedData) {
-        const { editor } = embedData;
-        const cursor = editor.getCursor();
-        const line = editor.getLine(cursor.line);
-        if (line.startsWith('\t')) {
-            editor.replaceRange('', {line: cursor.line, ch: 0}, {line: cursor.line, ch: 1});
-        }
-        return true;
-    }
-
-    insertTagCommand(embedData) {
-        const { editor } = embedData;
-        editor.replaceSelection('#');
-        return true;
-    }
-
-    swapLineUpCommand(embedData) {
-        const { editor } = embedData;
-        const cursor = editor.getCursor();
-        if (cursor.line > 0) {
-            const currentLine = editor.getLine(cursor.line);
-            const prevLine = editor.getLine(cursor.line - 1);
-            editor.transaction({
-                changes: [
-                    { from: {line: cursor.line - 1, ch: 0}, to: {line: cursor.line - 1, ch: prevLine.length}, text: currentLine },
-                    { from: {line: cursor.line, ch: 0}, to: {line: cursor.line, ch: currentLine.length}, text: prevLine }
-                ],
-                selection: { from: {line: cursor.line - 1, ch: cursor.ch} }
-            });
-        }
-        return true;
-    }
-
-    swapLineDownCommand(embedData) {
-        const { editor } = embedData;
-        const cursor = editor.getCursor();
-        if (cursor.line < editor.lastLine()) {
-            const currentLine = editor.getLine(cursor.line);
-            const nextLine = editor.getLine(cursor.line + 1);
-            editor.transaction({
-                changes: [
-                    { from: {line: cursor.line, ch: 0}, to: {line: cursor.line, ch: currentLine.length}, text: nextLine },
-                    { from: {line: cursor.line + 1, ch: 0}, to: {line: cursor.line + 1, ch: nextLine.length}, text: currentLine }
-                ],
-                selection: { from: {line: cursor.line + 1, ch: cursor.ch} }
-            });
-        }
-        return true;
-    }
-    
-    duplicateLineCommand(embedData) {
-        const { editor } = embedData;
-        const cursor = editor.getCursor();
-        const line = editor.getLine(cursor.line);
-        editor.replaceRange(`\n${line}`, {line: cursor.line, ch: line.length});
-        return true;
-    }
-
-    deleteLineCommand(embedData) {
-        const { editor } = embedData;
-        const { line } = editor.getCursor();
-        editor.replaceRange('', {line: line, ch: 0}, {line: line + 1, ch: 0});
-        return true;
-    }
-
-
-    // MAIN PROCESSING METHODS
-    async processSyncBlock(source, el, ctx) {
-        el.empty();
-        const syncContainer = el.createDiv('sync-container');
-        const embedLines = source.split('\n').map(line => line.trim()).filter(line => line.startsWith('![[') && line.endsWith(']]'));
-
-        if (embedLines.length === 0) {
-            syncContainer.createDiv('sync-empty').setText('No embeds found in sync block');
-            return;
-        }
-
-        for (let i = 0; i < embedLines.length; i++) {
-            await this.processEmbed(embedLines[i], syncContainer, ctx, i > 0);
+            document.body.addClass('sync-embeds-no-focus-highlight');
         }
     }
 
-    async processEmbed(embedLine, container, ctx, addGap) {
-        try {
-            const match = embedLine.match(/!\[\[([^\]]+)\]\]/);
-            if (!match) return;
-
-            const linkText = match[1];
-            const linkPath = linkText.split('|')[0].trim();
-            let notePath = linkPath.split('#')[0];
-            const section = linkPath.includes('#') ? linkPath.substring(linkPath.indexOf('#') + 1) : null;
-
-            if (!notePath) notePath = ctx.sourcePath;
-
-            const file = this.app.metadataCache.getFirstLinkpathDest(notePath, ctx.sourcePath);
-            if (!file) { this.renderError(container, `Note not found: ${notePath}`, addGap); return; }
-            if (file.path === ctx.sourcePath) { this.renderError(container, "Cannot create a recursive embed of the same note.", addGap); return; }
-
-            const embedContainer = container.createDiv('sync-embed');
-            if (addGap) embedContainer.addClass('sync-embed-gap');
-
-            const component = new Component();
-            const leaf = new WorkspaceLeaf(this.app);
-            component.load();
-            
-            component.addChild(new (class extends Component { 
-                constructor(plugin, containerEl) {
-                    super();
-                    this.plugin = plugin;
-                    this.containerEl = containerEl;
-                }
-                async onunload() { 
-                    this.plugin.embedRegistry.delete(this.containerEl);
-                    if (this.plugin.currentFocusedEmbed && this.plugin.currentFocusedEmbed.containerEl === this.containerEl) {
-                        this.plugin.currentFocusedEmbed = null;
-                    }
-                    leaf.detach(); 
-                } 
-            })(this, embedContainer));
-
-            await leaf.openFile(file, { state: { mode: "source" } });
-            const view = leaf.view;
-
-            if (!(view instanceof MarkdownView)) {
-                this.renderError(embedContainer, 'Failed to load a markdown view.', addGap);
-                leaf.detach();
-                return;
-            }
-
-            const embedData = { view, editor: view.editor, containerEl: embedContainer, file, section, component };
-            this.embedRegistry.set(embedContainer, embedData);
-
-            if (section) {
-                await this.setupSectionEmbed(embedData);
-            }
-
-            embedContainer.appendChild(view.containerEl);
-            embedContainer.style.height = 'auto';
-            ctx.addChild(component);
-
-        } catch (error) {
-            console.error('Sync Embeds: Error processing embed:', error);
-            this.renderError(container, `Error loading: ${error.message}`, addGap);
-        }
-    }
-
-    async setupSectionEmbed(embedData) {
-        const { view, file, section, component } = embedData;
+    refreshAllEmbeds() {
+        // Update CSS variables for all sync containers
+        document.querySelectorAll('.sync-container').forEach(container => {
+            container.style.setProperty('--sync-embed-height', this.settings.embedHeight);
+            container.style.setProperty('--sync-max-height', this.settings.maxEmbedHeight);
+            container.style.setProperty('--sync-gap', this.settings.gapBetweenEmbeds);
+        });
         
-        let isProgrammaticUpdate = false;
-        let isSaving = false;
-        let originalHeader = "";
-        let headerLevel = 0;
-
-        const updateHeaderState = (content) => {
-            originalHeader = content.split('\n')[0] || '';
-            headerLevel = (originalHeader.match(/^#+/)?.[0] || '#').length;
-        };
-
-        const loadSection = async () => {
-            isProgrammaticUpdate = true;
-            const fileContent = await this.app.vault.read(file);
-            const currentSectionContent = this.extractSection(fileContent, section);
-            updateHeaderState(currentSectionContent);
-            const cursor = view.editor.getCursor();
-            view.editor.setValue(currentSectionContent);
-            if (view.editor.getDoc().lineCount() > cursor.line && view.editor.getLine(cursor.line).length >= cursor.ch) {
-                view.editor.setCursor(cursor);
-            }
-            setTimeout(() => isProgrammaticUpdate = false, 50);
-        };
-        
-        await loadSection();
-        view.file = null;
-
-        const debouncedSave = debounce(async () => {
-            if (isSaving) return;
-            isSaving = true;
-            const newEmbedContent = view.editor.getValue();
-            const currentFileContent = await this.app.vault.read(file);
-            const newFileContent = this.replaceSection(currentFileContent, section, newEmbedContent);
-            if (newFileContent !== currentFileContent) {
-                await this.app.vault.modify(file, newFileContent);
-            }
-            isSaving = false;
-        }, 750, true);
-
-        component.registerEvent(this.app.vault.on('modify', async (modifiedFile) => {
-            if (modifiedFile.path === file.path && !isSaving) await loadSection();
-        }));
-
-        let lastCorrectedLineNumber = -1;
-        component.registerEvent(this.app.workspace.on('editor-change', (editor) => {
-            if (editor !== view.editor || isProgrammaticUpdate) return;
-            const cursorPos = editor.getCursor();
-            const line = editor.getLine(cursorPos.line);
-            const currentLineNumber = cursorPos.line;
-
-            if (currentLineNumber === 0 && line !== originalHeader) {
-                isProgrammaticUpdate = true;
-                editor.replaceRange(originalHeader, { line: 0, ch: 0 }, { line: 0, ch: line.length });
-                isProgrammaticUpdate = false;
-                return;
-            }
-
-            if (currentLineNumber > 0 && line.trim().startsWith('#')) {
-                const currentHashes = (line.match(/^#+/) || [''])[0];
-                const currentLevel = currentHashes.length;
-                const requiredLevel = headerLevel + 1;
-                const requiredHashes = '#'.repeat(requiredLevel);
-
-                if (currentLineNumber === lastCorrectedLineNumber && currentLevel < requiredLevel) {
-                   isProgrammaticUpdate = true;
-                   editor.replaceRange("", { line: currentLineNumber, ch: 0 }, { line: currentLineNumber, ch: currentLevel });
-                   isProgrammaticUpdate = false;
-                   lastCorrectedLineNumber = -1;
-                   debouncedSave();
-                   return;
-                }
-                
-                if (currentLevel <= headerLevel) {
-                    isProgrammaticUpdate = true;
-                    editor.replaceRange(requiredHashes, { line: currentLineNumber, ch: 0 }, { line: currentLineNumber, ch: currentLevel });
-                    lastCorrectedLineNumber = currentLineNumber;
-                    isProgrammaticUpdate = false;
-                } else { lastCorrectedLineNumber = -1; }
-            } else { lastCorrectedLineNumber = -1; }
-
-            debouncedSave();
-        }));
+        this.log('Refreshed all embeds with new settings');
     }
 
-    // UTILITY AND SECTION HELPERS
-    renderError(container, message, addGap) {
-        const errorDiv = container.createDiv('sync-embed-error');
-        if (addGap) errorDiv.addClass('sync-embed-gap');
-        errorDiv.setText(message);
-    }
-
-    escapeRegExp(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    extractSection(content, sectionName) {
-        const lines = content.split('\n');
-        const headerRegex = new RegExp(`^#{1,6}\\s+${this.escapeRegExp(sectionName)}\\s*$`);
-        let startIdx = -1, sectionLevel = 0;
-
-        for (let i = 0; i < lines.length; i++) {
-            if (headerRegex.test(lines[i])) {
-                startIdx = i;
-                sectionLevel = (lines[i].match(/^#+/)?.[0] || '').length;
-                break;
-            }
+    // Debug logging
+    log(...args) {
+        if (this.settings.debugMode) {
+            console.log('[Sync Embeds]', ...args);
         }
-        if (startIdx === -1) return `# ${sectionName}\n\n*Section not found.*`;
-        
-        let endIdx = lines.length;
-        for (let i = startIdx + 1; i < lines.length; i++) {
-            const match = lines[i].match(/^#+/);
-            if (match && match[0].length <= sectionLevel) {
-                endIdx = i;
-                break;
-            }
-        }
-        return lines.slice(startIdx, endIdx).join('\n');
-    }
-
-    replaceSection(fullContent, sectionName, newSectionText) {
-        const lines = fullContent.split('\n');
-        const headerRegex = new RegExp(`^#{1,6}\\s+${this.escapeRegExp(sectionName)}\\s*$`);
-        let startIdx = -1, sectionLevel = 0;
-
-        for (let i = 0; i < lines.length; i++) {
-            if (headerRegex.test(lines[i])) {
-                startIdx = i;
-                sectionLevel = (lines[i].match(/^#+/)?.[0] || '').length;
-                break;
-            }
-        }
-        if (startIdx === -1) return `${fullContent.trim()}\n\n${newSectionText}`.trim();
-        
-        let endIdx = lines.length;
-        for (let i = startIdx + 1; i < lines.length; i++) {
-            const match = lines[i].match(/^#+/);
-            if (match && match[0].length <= sectionLevel) {
-                endIdx = i;
-                break;
-            }
-        }
-        
-        const before = lines.slice(0, startIdx);
-        const after = lines.slice(endIdx);
-        return [...before, ...newSectionText.split('\n'), ...after].join('\n');
     }
 };
