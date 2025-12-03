@@ -277,15 +277,17 @@ class EmbedManager {
 
             // For section embeds, setup viewport restriction
             if (section) {
-                await this.viewportController.setupSectionViewport(embedData);
-                
-                // If there's an alias, show it instead of the actual header
+                // Check if we should hide the header from viewport
+                // Hide if: explicitly set to false, OR if there's an alias (alias replaces header)
+                const hideHeader = customOptions.header === false || alias;
+                await this.viewportController.setupSectionViewport(embedData, hideHeader);
+                // If there's an alias, show it as a header
                 if (alias) {
-                    this.setupAliasDisplay(embedData, alias, true);
+                    this.setupAliasDisplay(embedData, alias);
                 }
             } else if (alias) {
                 // For whole note embeds with alias, show alias as title
-                this.setupAliasDisplay(embedData, alias, false);
+                this.setupAliasDisplay(embedData, alias);
             }
 
             // Handle properties collapse
@@ -294,8 +296,8 @@ class EmbedManager {
             }
 
             // Handle inline title visibility
-            const showTitle = customOptions.title !== undefined 
-                ? customOptions.title 
+            const showTitle = customOptions.title !== undefined
+                ? customOptions.title
                 : this.plugin.settings.showInlineTitle;
             
             if (!showTitle || section) {
@@ -316,7 +318,7 @@ class EmbedManager {
         }
     }
 
-    setupAliasDisplay(embedData, displayAlias, isSection) {
+    setupAliasDisplay(embedData, displayAlias) {
         const { view } = embedData;
         
         requestAnimationFrame(() => {
@@ -325,20 +327,6 @@ class EmbedManager {
                 const titleEl = view.containerEl.querySelector('.inline-title');
                 if (titleEl) {
                     titleEl.style.display = 'none';
-                }
-
-                // For section embeds, also hide the section header
-                if (isSection) {
-                    const cmContent = view.containerEl.querySelector('.cm-content');
-                    if (cmContent) {
-                        if (embedData.sectionInfo) {
-                            const headerLineNumber = embedData.sectionInfo.startLine + 1;
-                            const firstLine = cmContent.querySelector(`.cm-line:nth-child(${headerLineNumber})`);
-                            if (firstLine) {
-                                firstLine.style.display = 'none';
-                            }
-                        }
-                    }
                 }
 
                 // Create and insert alias header with consistent styling
@@ -382,6 +370,35 @@ class EmbedManager {
                     titleEl.style.display = 'none';
                 }
             }, 50);
+        });
+    }
+
+    hideSectionHeader(embedData) {
+        const { view } = embedData;
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                // Hide the inline title first
+                const titleEl = view.containerEl.querySelector('.inline-title');
+                if (titleEl) {
+                    titleEl.style.display = 'none';
+                }
+
+                // Hide the section header (the actual markdown heading)
+                const cmContent = view.containerEl.querySelector('.cm-content');
+                if (cmContent && embedData.sectionInfo) {
+                    const headerLineNumber = embedData.sectionInfo.startLine + 1;
+                    const firstLine = cmContent.querySelector(`.cm-line:nth-child(${headerLineNumber})`);
+                    if (firstLine) {
+                        firstLine.style.display = 'none';
+                        firstLine.style.visibility = 'hidden';
+                        firstLine.style.height = '0';
+                        firstLine.style.overflow = 'hidden';
+                        firstLine.style.margin = '0';
+                        firstLine.style.padding = '0';
+                    }
+                } else {
+                }
+            }, 100);
         });
     }
 
