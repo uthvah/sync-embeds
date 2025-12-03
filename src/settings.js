@@ -230,7 +230,8 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
             <ul>
                 <li><code>![[Note|Alias{height:500px}]]</code> - Custom height for this embed</li>
                 <li><code>![[Note|Alias{maxHeight:600px}]]</code> - Custom max height</li>
-                <li><code>![[Note|Alias{title:false}]]</code> - Hide title for this embed</li>
+                <li><code>![[Note|Alias{title:false}]]</code> - Hide inline title for this embed</li>
+                <li><code>![[Note#Section{header:false}]]</code> - Hide section header (e.g., hide "# Section")</li>
                 <li><code>![[Note|Alias{height:400px,title:false}]]</code> - Multiple options</li>
             </ul>
             <p><em>Note: Options go inside curly braces before the closing ]]</em></p>

@@ -5,7 +5,7 @@ class ViewportController {
         this.plugin = plugin;
     }
 
-    async setupSectionViewport(embedData) {
+    async setupSectionViewport(embedData, hideHeader = false) {
         const { view, editor, file, section } = embedData;
         
         // Wait for editor to be ready
@@ -23,6 +23,7 @@ class ViewportController {
         // Store section metadata
         embedData.sectionInfo = sectionInfo;
         embedData.viewportActive = true;
+        embedData.hideHeader = hideHeader;
         
         // Apply the viewport restriction
         this.applyViewportRestriction(embedData);
@@ -64,29 +65,29 @@ class ViewportController {
     }
 
     updateViewportCSS(embedData, style) {
-        const { sectionInfo, embedId } = embedData;
+        const { sectionInfo, embedId, hideHeader } = embedData;
         const { startLine, endLine } = sectionInfo;
-        
+        // If hideHeader is true, skip the header line by starting viewport one line later
+        const viewportStart = hideHeader ? startLine + 1 : startLine;
         // PERFORMANCE: Use efficient CSS selectors
         const css = `
-            /* Hide all lines before the section */
-            [data-embed-id="${embedId}"] .cm-line:nth-child(-n+${startLine}) { 
-                display: none !important; 
+            /* Hide all lines before the section (or before first content line if hiding header) */
+            [data-embed-id="${embedId}"] .cm-line:nth-child(-n+${viewportStart}) {
+                display: none !important;
             }
-            
             /* Hide all lines after the section */
-            [data-embed-id="${embedId}"] .cm-line:nth-child(n+${endLine + 1}) { 
-                display: none !important; 
+            [data-embed-id="${embedId}"] .cm-line:nth-child(n+${endLine + 1}) {
+                display: none !important;
             }
-            
-            /* Style the header line - No background, proper theming */
+            /* Style the header line - No background, proper theming (only if not hiding) */
+            ${!hideHeader ? `
             [data-embed-id="${embedId}"] .cm-line:nth-child(${startLine + 1}) {
                 pointer-events: none !important;
                 user-select: none !important;
                 cursor: default !important;
             }
+            ` : ''}
         `;
-        
         style.textContent = css;
     }
 
@@ -345,15 +346,16 @@ class ViewportController {
     }
 
     scrollToSection(embedData) {
-        const { view, editor, sectionInfo } = embedData;
+        const { view, editor, sectionInfo, hideHeader } = embedData;
         const { startLine } = sectionInfo;
-        
+        // If hiding header, start at the line after the header
+        const firstEditableLine = hideHeader ? startLine + 1 : startLine;
         setTimeout(() => {
-            // Scroll to the start of the section
-            editor.scrollIntoView({ line: startLine, ch: 0 }, true);
-            
-            // Set cursor at line after header
-            editor.setCursor({ line: startLine + 1, ch: 0 });
+            // Scroll to the start of the section (or first content line if hiding header)
+            editor.scrollIntoView({ line: firstEditableLine, ch: 0 }, true);
+
+            // Set cursor at first editable line
+            editor.setCursor({ line: firstEditableLine, ch: 0 });
         }, 150);
     }
 
