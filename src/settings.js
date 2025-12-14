@@ -139,6 +139,16 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
+            .setName('Show properties toggle button')
+            .setDesc('Display a toggle button to collapse/expand properties in embeds')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showPropertiesToggle)
+                .onChange(async (value) => {
+                    this.plugin.settings.showPropertiesToggle = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
             .setName('Show inline title')
             .setDesc('Display note title at the top of whole-note embeds (not applicable to section embeds or embeds with aliases)')
             .addToggle(toggle => toggle

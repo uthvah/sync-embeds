@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS = {
     showFocusHighlight: true,
     showHeaderHints: true,           // NEW: Header hints (enforcement is always on)
     hideSectionHeaders: false,       // NEW: Hide headers in section embeds
+    showPropertiesToggle: true,      // NEW: Show properties collapse toggle button
     debugMode: false
 };
 

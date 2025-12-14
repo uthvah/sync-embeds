@@ -372,12 +372,15 @@ class EmbedManager {
 
                 propertiesEl.classList.add('is-collapsed');
 
-                const toggleBtn = propertiesEl.createDiv('properties-collapse-toggle');
-                toggleBtn.innerHTML = 'â–¶';
-                toggleBtn.onclick = () => {
-                    propertiesEl.classList.toggle('is-collapsed');
-                    toggleBtn.innerHTML = propertiesEl.classList.contains('is-collapsed') ? 'â–¶' : 'â–¼';
-                };
+                // Only create toggle button if setting is enabled
+                if (this.plugin.settings.showPropertiesToggle) {
+                    const toggleBtn = propertiesEl.createDiv('properties-collapse-toggle');
+                    toggleBtn.innerHTML = '▶';
+                    toggleBtn.onclick = () => {
+                        propertiesEl.classList.toggle('is-collapsed');
+                        toggleBtn.innerHTML = propertiesEl.classList.contains('is-collapsed') ? '▶' : '▼';
+                    };
+                }
             }, 100);
         });
     }
