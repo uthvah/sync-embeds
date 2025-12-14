@@ -162,6 +162,16 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
         containerEl.createEl('h3', { text: 'Header Management' });
 
         new Setting(containerEl)
+            .setName('Hide section headers')
+            .setDesc('Hide the header when embedding a section under a header')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.hideSectionHeaders)
+                .onChange(async (value) => {
+                    this.plugin.settings.hideSectionHeaders = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
             .setName('Show header hints')
             .setDesc('Display helpful notices when header creation is blocked in section embeds')
             .addToggle(toggle => toggle

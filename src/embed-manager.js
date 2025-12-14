@@ -45,6 +45,15 @@ class EmbedManager {
         return null;
     }
 
+    refreshViewportCSS() {
+        // Update viewport CSS for all active section embeds
+        this.activeEmbeds.forEach(embedData => {
+            if (embedData.viewportActive && embedData.viewportStyle) {
+                this.viewportController.updateViewportCSS(embedData, embedData.viewportStyle);
+            }
+        });
+    }
+
     async processSyncBlock(source, el, ctx) {
         el.empty();
         const syncContainer = el.createDiv('sync-container');
