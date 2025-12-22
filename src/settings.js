@@ -195,8 +195,18 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
         containerEl.createEl('h3', { text: 'Performance' });
 
         new Setting(containerEl)
+            .setName('Load all embeds on page load')
+            .setDesc('Load all sync embeds immediately when the page loads, instead of waiting for them to scroll into view')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.loadAllOnPageLoad)
+                .onChange(async (value) => {
+                    this.plugin.settings.loadAllOnPageLoad = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
             .setName('Lazy loading threshold')
-            .setDesc('Start loading embeds this distance before they become visible')
+            .setDesc('Start loading embeds this distance before they become visible (only applies when "Load all embeds on page load" is disabled)')
             .addDropdown(dropdown => dropdown
                 .addOption('0px', 'On screen (0px)')
                 .addOption('100px', 'Just before (100px)')

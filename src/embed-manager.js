@@ -191,23 +191,31 @@ class EmbedManager {
             const placeholder = embedContainer.createDiv('sync-embed-placeholder');
             placeholder.setText(`Loading ${placeholderText}...`);
 
-            // Aggressive lazy loading to prevent scrollbar jumps
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        observer.disconnect();
-                        // Small delay to ensure smooth scrolling
-                        requestAnimationFrame(() => {
-                            this.loadEmbed(embedContainer, file, section, displayAlias, ctx, placeholder, options);
-                        });
-                    }
+            // Check if we should load all embeds on page load
+            if (this.plugin.settings.loadAllOnPageLoad) {
+                // Load immediately without intersection observer
+                requestAnimationFrame(() => {
+                    this.loadEmbed(embedContainer, file, section, displayAlias, ctx, placeholder, options);
                 });
-            }, {
-                rootMargin: this.plugin.settings.lazyLoadThreshold,
-                threshold: 0.01 // Start loading as soon as 1% is visible
-            });
+            } else {
+                // Aggressive lazy loading to prevent scrollbar jumps
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            observer.disconnect();
+                            // Small delay to ensure smooth scrolling
+                            requestAnimationFrame(() => {
+                                this.loadEmbed(embedContainer, file, section, displayAlias, ctx, placeholder, options);
+                            });
+                        }
+                    });
+                }, {
+                    rootMargin: this.plugin.settings.lazyLoadThreshold,
+                    threshold: 0.01 // Start loading as soon as 1% is visible
+                });
 
-            observer.observe(embedContainer);
+                observer.observe(embedContainer);
+            }
 
         } catch (error) {
             console.error('Sync Embeds: Error processing embed:', error);

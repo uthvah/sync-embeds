@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
     enableCommandInterception: true,
     gapBetweenEmbeds: '16px',
     lazyLoadThreshold: '100px',
+    loadAllOnPageLoad: false,
     showFocusHighlight: true,
     showHeaderHints: true,           // NEW: Header hints (enforcement is always on)
     hideSectionHeaders: false,       // NEW: Hide headers in section embeds
