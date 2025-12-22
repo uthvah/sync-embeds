@@ -1,0 +1,22 @@
+{
+  "name": "sync-embeds",
+  "version": "2.0.0",
+  "description": "Create fully editable, note embeds with advanced features including section viewports and dynamic paths.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production"
+  },
+  "keywords": [],
+  "author": "uthvah",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^16.11.6",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "0.17.3",
+    "obsidian": "latest"
+  },
+  "dependencies": {
+    "monkey-around": "^2.3.0"
+  }
+}

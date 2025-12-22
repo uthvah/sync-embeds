@@ -15,13 +15,17 @@ class ViewportController {
         const sectionInfo = this.findSectionBounds(content, section);
         
         if (sectionInfo.startLine === -1) {
-            // Section not found
-            editor.setValue(`# ${section}\n\n*Section not found in file.*`);
+            // Section not found - show notice instead of overwriting content
+            new Notice(`Section "${section}" not found in file.`, 5000);
             return;
         }
         
-        // Store section metadata
+        // Count properties/frontmatter lines to adjust viewport
+        const propertiesLineCount = this.countPropertiesLines(content);
+        
+        // Store section metadata with properties adjustment
         embedData.sectionInfo = sectionInfo;
+        embedData.propertiesLineCount = propertiesLineCount;
         embedData.viewportActive = true;
         
         // Apply the viewport restriction
@@ -64,28 +68,30 @@ class ViewportController {
     }
 
     updateViewportCSS(embedData, style) {
-        const { sectionInfo, embedId } = embedData;
+        const { sectionInfo, embedId, propertiesLineCount = 0 } = embedData;
         const { startLine, endLine } = sectionInfo;
+        const hideHeader = this.plugin.settings.hideSectionHeaders;
         
+        let adjustedStartLine = startLine - propertiesLineCount;
+        let adjustedEndLine = endLine - propertiesLineCount;
+        
+        if (hideHeader) {
+            adjustedStartLine += 1;
+        }
+
         // PERFORMANCE: Use efficient CSS selectors
-        const css = `
+        let css = `
             /* Hide all lines before the section */
-            [data-embed-id="${embedId}"] .cm-line:nth-child(-n+${startLine}) { 
+            [data-embed-id="${embedId}"] .cm-line:nth-child(-n+${adjustedStartLine + 1}) { 
                 display: none !important; 
             }
             
             /* Hide all lines after the section */
-            [data-embed-id="${embedId}"] .cm-line:nth-child(n+${endLine + 1}) { 
+            [data-embed-id="${embedId}"] .cm-line:nth-child(n+${adjustedEndLine + 1}) { 
                 display: none !important; 
             }
-            
-            /* Style the header line - No background, proper theming */
-            [data-embed-id="${embedId}"] .cm-line:nth-child(${startLine + 1}) {
-                pointer-events: none !important;
-                user-select: none !important;
-                cursor: default !important;
-            }
         `;
+        
         
         style.textContent = css;
     }
@@ -277,6 +283,9 @@ class ViewportController {
             if (newSectionInfo.startLine !== -1) {
                 embedData.sectionInfo = newSectionInfo;
                 
+                // recalculate properties line count on content change
+                embedData.propertiesLineCount = this.countPropertiesLines(currentContent);
+                
                 // Update CSS synchronously to prevent flashing
                 if (embedData.viewportStyle) {
                     this.updateViewportCSS(embedData, embedData.viewportStyle);
@@ -393,6 +402,35 @@ class ViewportController {
 
     escapeRegExp(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    countPropertiesLines(content) {
+        // Count the number of lines used by frontmatter/properties
+        // Properties are wrapped in --- markers at the start of the file
+        const lines = content.split('\n');
+        
+        // Check if file starts with properties
+        if (lines.length === 0 || lines[0] !== '---') {
+            return 0;
+        }
+        
+        // Find the closing --- marker
+        let propertiesEndLine = -1;
+        for (let i = 1; i < lines.length; i++) {
+            if (lines[i] === '---') {
+                propertiesEndLine = i;
+                break;
+            }
+        }
+        
+        if (propertiesEndLine === -1) {
+            // Invalid frontmatter, no closing marker
+            return 0;
+        }
+        
+        // Return the number of lines including both --- markers
+        // These lines are NOT rendered as .cm-line elements
+        return propertiesEndLine + 1;
     }
 
     cleanupViewport(embedData) {

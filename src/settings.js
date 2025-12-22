@@ -139,6 +139,16 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
+            .setName('Show properties toggle button')
+            .setDesc('Display a toggle button to collapse/expand properties in embeds')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showPropertiesToggle)
+                .onChange(async (value) => {
+                    this.plugin.settings.showPropertiesToggle = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
             .setName('Show inline title')
             .setDesc('Display note title at the top of whole-note embeds (not applicable to section embeds or embeds with aliases)')
             .addToggle(toggle => toggle
@@ -162,6 +172,16 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
         containerEl.createEl('h3', { text: 'Header Management' });
 
         new Setting(containerEl)
+            .setName('Hide section headers')
+            .setDesc('Hide the header when embedding a section under a header')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.hideSectionHeaders)
+                .onChange(async (value) => {
+                    this.plugin.settings.hideSectionHeaders = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
             .setName('Show header hints')
             .setDesc('Display helpful notices when header creation is blocked in section embeds')
             .addToggle(toggle => toggle
@@ -175,8 +195,18 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
         containerEl.createEl('h3', { text: 'Performance' });
 
         new Setting(containerEl)
+            .setName('Load all embeds on page load')
+            .setDesc('Load all sync embeds immediately when the page loads, instead of waiting for them to scroll into view')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.loadAllOnPageLoad)
+                .onChange(async (value) => {
+                    this.plugin.settings.loadAllOnPageLoad = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
             .setName('Lazy loading threshold')
-            .setDesc('Start loading embeds this distance before they become visible')
+            .setDesc('Start loading embeds this distance before they become visible (only applies when "Load all embeds on page load" is disabled)')
             .addDropdown(dropdown => dropdown
                 .addOption('0px', 'On screen (0px)')
                 .addOption('100px', 'Just before (100px)')

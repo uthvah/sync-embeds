@@ -45,6 +45,15 @@ class EmbedManager {
         return null;
     }
 
+    refreshViewportCSS() {
+        // Update viewport CSS for all active section embeds
+        this.activeEmbeds.forEach(embedData => {
+            if (embedData.viewportActive && embedData.viewportStyle) {
+                this.viewportController.updateViewportCSS(embedData, embedData.viewportStyle);
+            }
+        });
+    }
+
     async processSyncBlock(source, el, ctx) {
         el.empty();
         const syncContainer = el.createDiv('sync-container');
@@ -182,23 +191,31 @@ class EmbedManager {
             const placeholder = embedContainer.createDiv('sync-embed-placeholder');
             placeholder.setText(`Loading ${placeholderText}...`);
 
-            // Aggressive lazy loading to prevent scrollbar jumps
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        observer.disconnect();
-                        // Small delay to ensure smooth scrolling
-                        requestAnimationFrame(() => {
-                            this.loadEmbed(embedContainer, file, section, displayAlias, ctx, placeholder, options);
-                        });
-                    }
+            // Check if we should load all embeds on page load
+            if (this.plugin.settings.loadAllOnPageLoad) {
+                // Load immediately without intersection observer
+                requestAnimationFrame(() => {
+                    this.loadEmbed(embedContainer, file, section, displayAlias, ctx, placeholder, options);
                 });
-            }, {
-                rootMargin: this.plugin.settings.lazyLoadThreshold,
-                threshold: 0.01 // Start loading as soon as 1% is visible
-            });
+            } else {
+                // Aggressive lazy loading to prevent scrollbar jumps
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            observer.disconnect();
+                            // Small delay to ensure smooth scrolling
+                            requestAnimationFrame(() => {
+                                this.loadEmbed(embedContainer, file, section, displayAlias, ctx, placeholder, options);
+                            });
+                        }
+                    });
+                }, {
+                    rootMargin: this.plugin.settings.lazyLoadThreshold,
+                    threshold: 0.01 // Start loading as soon as 1% is visible
+                });
 
-            observer.observe(embedContainer);
+                observer.observe(embedContainer);
+            }
 
         } catch (error) {
             console.error('Sync Embeds: Error processing embed:', error);
@@ -363,12 +380,15 @@ class EmbedManager {
 
                 propertiesEl.classList.add('is-collapsed');
 
-                const toggleBtn = propertiesEl.createDiv('properties-collapse-toggle');
-                toggleBtn.innerHTML = 'â–¶';
-                toggleBtn.onclick = () => {
-                    propertiesEl.classList.toggle('is-collapsed');
-                    toggleBtn.innerHTML = propertiesEl.classList.contains('is-collapsed') ? 'â–¶' : 'â–¼';
-                };
+                // Only create toggle button if setting is enabled
+                if (this.plugin.settings.showPropertiesToggle) {
+                    const toggleBtn = propertiesEl.createDiv('properties-collapse-toggle');
+                    toggleBtn.innerHTML = '▶';
+                    toggleBtn.onclick = () => {
+                        propertiesEl.classList.toggle('is-collapsed');
+                        toggleBtn.innerHTML = propertiesEl.classList.contains('is-collapsed') ? '▶' : '▼';
+                    };
+                }
             }, 100);
         });
     }

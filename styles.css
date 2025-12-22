@@ -3,17 +3,17 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
   background: var(--background-primary);
-  margin: 12px 0;
+  margin: 0px 0px;
   display: flex;
   flex-direction: column;
   gap: var(--sync-gap, 16px);
-  padding: 16px;
+  padding: 12px;
 }
 
 /* === EMBED WRAPPER === */
 .sync-embed {
   border: none !important;
-  margin: 0 !important;
+  margin: 0px !important;
   padding: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -56,11 +56,11 @@
   background-color: transparent !important;
   
   /* Aesthetic bottom padding - matches native Obsidian feel */
-  padding-bottom: 18px !important;
+  padding-bottom: 0px !important;
   
   /* Native Obsidian horizontal padding - fixed at 10px regardless of readable line width */
-  padding-left: 10px !important;
-  padding-right: 10px !important;
+  /* padding-left: 4px !important;
+  padding-right: 4px !important; */
 }
 
 /* 5. Ensure full width */
@@ -86,7 +86,7 @@
   border: none !important;
   box-shadow: none !important;
   outline: none !important;
-  padding-top: 16px !important;
+  padding-top: 6px !important;
   padding-left: 10px !important;
   padding-right: 10px !important;
 }
@@ -123,6 +123,12 @@
 }
 
 /* === PROPERTIES/FRONTMATTER === */
+.sync-embed .metadata-container {
+  padding-top: 6px !important;
+  padding-bottom: 0px !important;
+  margin-bottom: 0px !important;
+}
+
 .metadata-container.is-collapsed .metadata-content {
   display: none;
 }

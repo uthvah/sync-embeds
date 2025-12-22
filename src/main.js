@@ -12,8 +12,11 @@ const DEFAULT_SETTINGS = {
     enableCommandInterception: true,
     gapBetweenEmbeds: '16px',
     lazyLoadThreshold: '100px',
+    loadAllOnPageLoad: false,
     showFocusHighlight: true,
     showHeaderHints: true,           // NEW: Header hints (enforcement is always on)
+    hideSectionHeaders: false,       // NEW: Hide headers in section embeds
+    showPropertiesToggle: true,      // NEW: Show properties collapse toggle button
     debugMode: false
 };
 
@@ -281,6 +284,11 @@ module.exports = class SyncEmbedPlugin extends Plugin {
             container.style.setProperty('--sync-max-height', this.settings.maxEmbedHeight);
             container.style.setProperty('--sync-gap', this.settings.gapBetweenEmbeds);
         });
+        
+        // Update viewport CSS for section embeds (header visibility)
+        if (this.embedManager) {
+            this.embedManager.refreshViewportCSS();
+        }
         
         this.log('Refreshed all embeds with new settings');
     }
