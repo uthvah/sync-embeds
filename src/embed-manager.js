@@ -25,7 +25,7 @@ class EmbedManager {
             }
         });
         this.activeEmbeds.clear();
-        
+
         // Clean up dynamic paths cache
         if (this.dynamicPaths) {
             this.dynamicPaths.cleanup();
@@ -48,7 +48,7 @@ class EmbedManager {
     async processSyncBlock(source, el, ctx) {
         el.empty();
         const syncContainer = el.createDiv('sync-container');
-        
+
         // Apply CSS custom properties
         syncContainer.style.setProperty('--sync-embed-height', this.plugin.settings.embedHeight);
         syncContainer.style.setProperty('--sync-max-height', this.plugin.settings.maxEmbedHeight);
@@ -70,7 +70,7 @@ class EmbedManager {
         for (let i = 0; i < embedLines.length; i++) {
             await this.processEmbed(embedLines[i], syncContainer, ctx, i > 0);
         }
-        
+
         // Remove min-height after all loaded
         setTimeout(() => {
             syncContainer.style.minHeight = '';
@@ -81,11 +81,11 @@ class EmbedManager {
         // Parse options like: ![[note|alias{height:500px,title:false}]]
         const optionsMatch = line.match(/\{([^}]+)\}\]\]$/);
         const options = {};
-        
+
         if (optionsMatch) {
             const optionsStr = optionsMatch[1];
             const pairs = optionsStr.split(',');
-            
+
             pairs.forEach(pair => {
                 const [key, value] = pair.split(':').map(s => s.trim());
                 if (key && value !== undefined) {
@@ -95,11 +95,11 @@ class EmbedManager {
                     else options[key] = value;
                 }
             });
-            
+
             // Remove options from line for further parsing
             line = line.replace(/\{[^}]+\}\]\]$/, ']]');
         }
-        
+
         return { line, options };
     }
 
@@ -107,23 +107,23 @@ class EmbedManager {
         try {
             // Parse custom options first
             const { line: cleanedLine, options } = this.parseEmbedOptions(embedLine);
-            
+
             // Parse embed syntax: ![[path#section|alias]]
             const match = cleanedLine.match(/!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/);
             if (!match) return;
 
             let linkText = match[1];
             let displayAlias = match[2]?.trim();
-            
+
             // Check if this has dynamic patterns
             const hasDynamicPattern = /\{\{(date|time|title)/.test(linkText);
-            
+
             if (hasDynamicPattern) {
                 // Check cache first (with 1 second TTL for date patterns)
                 const cacheKey = `${linkText}-${ctx.sourcePath}`;
                 const cached = this.dynamicPaths.pathCache.get(cacheKey);
                 const now = Date.now();
-                
+
                 let resolvedText;
                 if (cached && (now - cached.timestamp < 1000)) {
                     resolvedText = cached.value;
@@ -134,21 +134,21 @@ class EmbedManager {
                     // Resolve dynamic patterns
                     resolvedText = this.dynamicPaths.resolve(linkText, ctx);
                     this.dynamicPaths.pathCache.set(cacheKey, { value: resolvedText, timestamp: now });
-                    
+
                     if (this.plugin.settings.debugMode) {
                         console.log('[Sync Embeds] Fresh resolution:', linkText, 'â†’', resolvedText);
                     }
                 }
-                
+
                 // If no alias provided, use the original pattern as display name
                 if (!displayAlias) {
                     displayAlias = linkText;
                 }
-                
+
                 // CRITICAL: Use resolved text as the actual file path
                 linkText = resolvedText;
             }
-            
+
             const linkPath = linkText.split('|')[0].trim();
             let notePath = linkPath.split('#')[0];
             const section = linkPath.includes('#') ? linkPath.substring(linkPath.indexOf('#') + 1) : null;
@@ -160,7 +160,7 @@ class EmbedManager {
                 this.renderError(container, `Note not found: ${notePath}`, addGap);
                 return;
             }
-            
+
             // Only check for direct recursion
             if (file.path === ctx.sourcePath) {
                 this.renderError(container, "Cannot create a recursive embed of the same note.", addGap);
@@ -233,12 +233,12 @@ class EmbedManager {
                 async onunload() {
                     // Remove from active embeds
                     this.manager.activeEmbeds.delete(this.embedData);
-                    
+
                     // Clear focus if this was focused
                     if (this.manager.plugin.currentFocusedEmbed?.containerEl === this.embedData.containerEl) {
                         this.manager.plugin.currentFocusedEmbed = null;
                     }
-                    
+
                     // Properly detach the leaf and clean up the view
                     if (this.embedData.leaf) {
                         this.embedData.leaf.detach();
@@ -270,15 +270,24 @@ class EmbedManager {
             if (customOptions.height) {
                 embedContainer.style.setProperty('--sync-embed-height', customOptions.height);
             }
-            
+
             if (customOptions.maxHeight) {
                 embedContainer.style.setProperty('--sync-max-height', customOptions.maxHeight);
             }
 
-            // For section embeds, setup viewport restriction
+            // For section embeds, validate section exists then set up
             if (section) {
+                const content = view.editor.getValue();
+                const sectionInfo = this.viewportController.findSectionBounds(content, section);
+
+                if (sectionInfo.startLine === -1) {
+                    this.renderError(embedContainer.parentElement, `Section not found: ${section}`, false);
+                    leaf.detach();
+                    return;
+                }
+
                 await this.viewportController.setupSectionViewport(embedData);
-                
+
                 // If there's an alias, show it instead of the actual header
                 if (alias) {
                     this.setupAliasDisplay(embedData, alias, true);
@@ -294,10 +303,10 @@ class EmbedManager {
             }
 
             // Handle inline title visibility
-            const showTitle = customOptions.title !== undefined 
-                ? customOptions.title 
+            const showTitle = customOptions.title !== undefined
+                ? customOptions.title
                 : this.plugin.settings.showInlineTitle;
-            
+
             if (!showTitle || section) {
                 this.hideInlineTitle(embedData);
             }
@@ -306,7 +315,7 @@ class EmbedManager {
             placeholder.remove();
             embedContainer.appendChild(view.containerEl);
             embedContainer.removeClass('sync-embed-loading');
-            
+
             ctx.addChild(component);
 
         } catch (error) {
@@ -318,7 +327,7 @@ class EmbedManager {
 
     setupAliasDisplay(embedData, displayAlias, isSection) {
         const { view } = embedData;
-        
+
         requestAnimationFrame(() => {
             setTimeout(() => {
                 // Hide the inline title
@@ -344,7 +353,7 @@ class EmbedManager {
                 // Create and insert alias header with consistent styling
                 const aliasHeader = view.containerEl.createDiv('sync-embed-alias-header');
                 aliasHeader.textContent = displayAlias;
-                
+
                 const viewContent = view.containerEl.querySelector('.view-content');
                 if (viewContent) {
                     viewContent.insertBefore(aliasHeader, viewContent.firstChild);
@@ -355,7 +364,7 @@ class EmbedManager {
 
     setupPropertiesCollapse(embedData) {
         const { view } = embedData;
-        
+
         requestAnimationFrame(() => {
             setTimeout(() => {
                 const propertiesEl = view.containerEl.querySelector('.metadata-container');
