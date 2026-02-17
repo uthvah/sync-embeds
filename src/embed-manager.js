@@ -281,7 +281,15 @@ class EmbedManager {
                 const sectionInfo = this.viewportController.findSectionBounds(content, section);
 
                 if (sectionInfo.startLine === -1) {
-                    this.renderError(embedContainer.parentElement, `Section not found: ${section}`, false);
+                    // Cleanup
+                    embedContainer.empty();
+                    embedContainer.removeClass('sync-embed-loading');
+                    embedContainer.style.height = 'auto';
+                    embedContainer.style.minHeight = '0';
+
+                    // Render the error
+                    this.renderError(embedContainer, `Section not found: ${section}`, false);
+                    
                     leaf.detach();
                     return;
                 }
