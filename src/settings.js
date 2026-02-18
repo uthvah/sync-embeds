@@ -158,6 +158,16 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        new Setting(containerEl)
+            .setName('Show backlinks in embeds')
+            .setDesc('Display backlinks section at the bottom of embeds (not applicable if Obsidian\'s global setting for backlinks in documents is disabled)')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showBacklinksInEmbeds)
+                .onChange(async (value) => {
+                    this.plugin.settings.showBacklinksInEmbeds = value;
+                    await this.plugin.saveSettings();
+                }));
+
         // === HEADER MANAGEMENT SECTION ===
         containerEl.createEl('h3', { text: 'Header Management' });
 
@@ -225,16 +235,17 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
                 <li><code>![[Note Name|Custom Title]]</code> - Display with custom title</li>
                 <li><code>![[Note Name#Section|Custom Title]]</code> - Section with custom title</li>
             </ul>
-            
+
             <p><strong>Per-Embed Custom Options:</strong></p>
             <ul>
                 <li><code>![[Note|Alias{height:500px}]]</code> - Custom height for this embed</li>
                 <li><code>![[Note|Alias{maxHeight:600px}]]</code> - Custom max height</li>
                 <li><code>![[Note|Alias{title:false}]]</code> - Hide title for this embed</li>
+                <li><code>![[Note|Alias{backlinks:false}]]</code> - Hide backlinks for this embed</li>
                 <li><code>![[Note|Alias{height:400px,title:false}]]</code> - Multiple options</li>
             </ul>
             <p><em>Note: Options go inside curly braces before the closing ]]</em></p>
-            
+
             <p><strong>Dynamic Patterns:</strong></p>
             <ul>
                 <li><code>![[Daily/{{date:YYYY-MM-DD}}|Today]]</code> - Current date with display name</li>
@@ -245,7 +256,7 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
                 <li><code>{{time:HH:mm}}</code> - Current time</li>
                 <li><code>{{title}}</code> - Current note's title</li>
             </ul>
-            
+
             <p><strong>Header Management:</strong></p>
             <ul>
                 <li>Use <code>Alt+2</code> through <code>Alt+6</code> to insert headers (H2-H6)</li>
@@ -256,7 +267,7 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
                 <li>Whole-note embeds allow H1-H6 freely</li>
                 <li>These hotkeys can be customized in Obsidian's Hotkeys settings</li>
             </ul>
-            
+
             <p><strong>Date Format Examples:</strong></p>
             <ul>
                 <li><code>YYYY-MM-DD</code> - 2024-03-15</li>
@@ -264,7 +275,7 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
                 <li><code>DD MMM YYYY</code> - 15 Mar 2024</li>
                 <li><code>dddd, MMMM Do YYYY</code> - Friday, March 15th 2024</li>
             </ul>
-            
+
             <p><strong>Complete Example:</strong></p>
             <pre><code>\`\`\`sync
 ![[Daily Notes/{{date:YYYY-MM-DD}}|Today's Note]]
@@ -272,7 +283,7 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
 ![[Tasks#Inbox|My Tasks{height:300px}]]
 ![[Projects/{{title}}#Notes|Project Notes{title:false}]]
 \`\`\`</code></pre>
-            
+
             <p><strong>Tips:</strong></p>
             <ul>
                 <li>Use aliases (text after <code>|</code>) with dynamic patterns for better display</li>
@@ -284,7 +295,7 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
                 <li>Multiple embeds of the same note/section are allowed</li>
                 <li>Header hierarchy enforcement maintains document structure in section embeds</li>
             </ul>
-            
+
             <p><em>Note: Dynamic patterns are cached for 1 second to improve performance.</em></p>
         `;
 
@@ -334,15 +345,15 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
     validateCSSValue(value) {
         // Basic validation for CSS length values
         if (!value || value.trim() === '') return false;
-        
+
         // Allow common CSS units
         const validPattern = /^(auto|none|\d+(\.\d+)?(px|em|rem|vh|vw|%))$/;
         const isValid = validPattern.test(value.trim());
-        
+
         if (!isValid) {
             new Notice('Invalid CSS value. Use units like: px, em, rem, vh, vw, %, or "auto"/"none"');
         }
-        
+
         return isValid;
     }
 }

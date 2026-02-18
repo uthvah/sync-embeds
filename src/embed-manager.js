@@ -319,6 +319,15 @@ class EmbedManager {
                 this.hideInlineTitle(embedData);
             }
 
+            // Handle backlinks visibility
+            const showBacklinks = customOptions.backlinks !== undefined
+                ? customOptions.backlinks
+                : this.plugin.settings.showBacklinksInEmbeds;
+
+            if (!showBacklinks) {
+                this.hideBacklinks(embedData);
+            }
+
             // Remove placeholder and show actual content
             placeholder.remove();
             embedContainer.appendChild(view.containerEl);
@@ -399,6 +408,18 @@ class EmbedManager {
                     titleEl.style.display = 'none';
                 }
             }, 50);
+        });
+    }
+
+    hideBacklinks(embedData) {
+        const { view } = embedData;
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                const backlinksEl = view.containerEl.querySelector('.embedded-backlinks');
+                if (backlinksEl) {
+                    backlinksEl.style.display = 'none';
+                }
+            }, 100);
         });
     }
 
