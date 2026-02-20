@@ -20,7 +20,89 @@
   height: var(--sync-embed-height, auto);
   max-height: var(--sync-max-height, none);
   overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
+  /* border: 1px solid var(--background-modifier-border) !important; */
+}
+
+/* === STICKY ALIAS HEADER (CALLOUT STYLE) === */
+.sync-embed .markdown-source-view,
+.sync-embed .cm-editor,
+.sync-embed .cm-scroller,
+.sync-embed .view-content,
+.sync-embed .workspace-leaf-content {
+    overflow: visible !important;
+}
+
+.sync-embed-alias-header.is-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background-color: var(--background-primary) !important; 
+    padding: 8px 40px 8px 10px !important;
+    font-size: var(--font-text-size);
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    cursor: pointer;
+    user-select: none !important;
+    /* border-bottom: 1px solid var(--background-modifier-border) !important; */
+}
+
+.sync-embed-alias-header.is-sticky:hover {
+    background-color: var(--background-primary-alt) !important;
+}
+
+.sync-embed-alias-header.is-sticky a.internal-link {
+    text-decoration: none;
+    color: var(--text-accent) !important;
+    font-weight: 600 !important;
+    /* Truncation */
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sync-embed-alias-header.is-sticky a.internal-link:hover {
+    text-decoration: underline;
+    color: var(--text-accent-hover) !important;
+}
+
+/* === FOLD ICON === */
+.sync-embed-fold {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease-in-out;
+}
+
+.sync-embed-fold svg {
+    color: var(--text-muted);
+}
+
+/* === COLLAPSED STATE === */
+.sync-embed.is-collapsed {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+}
+
+/* Hide everything except header when collapsed */
+.sync-embed.is-collapsed .view-content > *:not(.sync-embed-alias-header) {
+    display: none !important;
+}
+
+/* Remove bottom border of header when collapsed */
+.sync-embed.is-collapsed .sync-embed-alias-header.is-sticky {
+    border-bottom: none !important;
+}
+
+/* Rotate fold icon when collapsed */
+.sync-embed.is-collapsed .sync-embed-fold {
+    transform: rotate(-90deg);
 }
 
 /* Gap between embeds */
@@ -107,13 +189,17 @@
   padding-right: 10px !important;
   margin-bottom: 0;
   
-  pointer-events: none !important;
   user-select: none !important;
   cursor: default !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   outline: none !important;
+}
+
+.sync-embed-alias-header a.internal-link {
+  color: inherit !important;
+  text-decoration: none;
 }
 
 /* Theme inheritance */

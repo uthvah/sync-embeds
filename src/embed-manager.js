@@ -1,4 +1,4 @@
-const { Component, WorkspaceLeaf, MarkdownView } = require('obsidian');
+const { Component, WorkspaceLeaf, MarkdownView, setIcon } = require('obsidian');
 const ViewportController = require('./viewport-controller');
 const DynamicPaths = require('./dynamic-paths');
 
@@ -182,6 +182,12 @@ class EmbedManager {
             const placeholder = embedContainer.createDiv('sync-embed-placeholder');
             placeholder.setText(`Loading ${placeholderText}...`);
 
+            const renderAsCallout = options.callout !== undefined ? options.callout : this.plugin.settings.renderAsCallout;
+
+            if (renderAsCallout) {
+                embedContainer.addClass('is-callout-style');
+            }
+
             // Aggressive lazy loading to prevent scrollbar jumps
             const observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
@@ -220,7 +226,8 @@ class EmbedManager {
                 alias,
                 component,
                 leaf,
-                customOptions
+                customOptions,
+                sourcePath: ctx.sourcePath
             };
 
             // Register cleanup
@@ -275,6 +282,16 @@ class EmbedManager {
                 embedContainer.style.setProperty('--sync-max-height', customOptions.maxHeight);
             }
 
+            // Handle collapse option
+            if (customOptions.collapse === true) {
+                embedContainer.addClass('is-collapsed');
+            }
+
+            const renderAsCallout = customOptions.callout !== undefined ? customOptions.callout : this.plugin.settings.renderAsCallout;
+
+            // Construct the display title: prefer alias, then "Note > Section", then just Note
+            const headerTitle = alias || (section ? `${file.basename} > ${section}` : file.basename);
+
             // For section embeds, validate section exists then set up
             if (section) {
                 const content = view.editor.getValue();
@@ -297,12 +314,12 @@ class EmbedManager {
                 await this.viewportController.setupSectionViewport(embedData);
 
                 // If there's an alias, show it instead of the actual header
-                if (alias) {
-                    this.setupAliasDisplay(embedData, alias, true);
+                if (alias || renderAsCallout) {
+                    this.setupAliasDisplay(embedData, headerTitle, true);
                 }
-            } else if (alias) {
-                // For whole note embeds with alias, show alias as title
-                this.setupAliasDisplay(embedData, alias, false);
+            } else if (alias || renderAsCallout) {
+                // For whole note embeds with alias or callout style, show title
+                this.setupAliasDisplay(embedData, headerTitle, false);
             }
 
             // Handle properties collapse
@@ -315,13 +332,17 @@ class EmbedManager {
                 ? customOptions.title
                 : this.plugin.settings.showInlineTitle;
 
-            if (!showTitle || section) {
+            // Hide title if disabled, if it's a section, OR if we're rendering as a callout (since callout has its own title)
+            if (!showTitle || section || renderAsCallout) {
                 this.hideInlineTitle(embedData);
             }
 
             // Remove placeholder and show actual content
-            placeholder.remove();
-            embedContainer.appendChild(view.containerEl);
+            // placeholder.remove();
+            // embedContainer.appendChild(view.containerEl);
+            // Using replaceWith instead of remove + appendChild
+            placeholder.replaceWith(view.containerEl);
+            
             embedContainer.removeClass('sync-embed-loading');
 
             ctx.addChild(component);
@@ -334,7 +355,10 @@ class EmbedManager {
     }
 
     setupAliasDisplay(embedData, displayAlias, isSection) {
-        const { view } = embedData;
+        const { view, file, section } = embedData;
+        const renderAsCallout = embedData.customOptions.callout !== undefined 
+            ? embedData.customOptions.callout 
+            : this.plugin.settings.renderAsCallout;
 
         requestAnimationFrame(() => {
             setTimeout(() => {
@@ -345,22 +369,48 @@ class EmbedManager {
                 }
 
                 // For section embeds, also hide the section header
-                if (isSection) {
+                if (isSection && embedData.sectionInfo) {
                     const cmContent = view.containerEl.querySelector('.cm-content');
                     if (cmContent) {
-                        if (embedData.sectionInfo) {
-                            const headerLineNumber = embedData.sectionInfo.startLine + 1;
-                            const firstLine = cmContent.querySelector(`.cm-line:nth-child(${headerLineNumber})`);
-                            if (firstLine) {
-                                firstLine.style.display = 'none';
-                            }
+                        const headerLineNumber = embedData.sectionInfo.startLine + 1;
+                        const firstLine = cmContent.querySelector(`.cm-line:nth-child(${headerLineNumber})`);
+                        if (firstLine) {
+                            firstLine.style.display = 'none';
                         }
                     }
                 }
 
                 // Create and insert alias header with consistent styling
                 const aliasHeader = view.containerEl.createDiv('sync-embed-alias-header');
-                aliasHeader.textContent = displayAlias;
+                
+                if (renderAsCallout) {
+                    aliasHeader.addClass('is-sticky');
+                    
+                    // Add fold button
+                    const foldBtn = aliasHeader.createDiv('sync-embed-fold');
+                    setIcon(foldBtn, 'chevron-down');
+                    
+                    // Create a clickable link
+                    const linkPath = section ? `${file.path}#${section}` : file.path;
+                    aliasHeader.createEl('a', {
+                        cls: 'internal-link',
+                        text: displayAlias,
+                        attr: {
+                            'href': linkPath,
+                            'data-href': linkPath
+                        }
+                    });
+
+                    // Handle toggle (only if clicking the header background, not the link)
+                    aliasHeader.addEventListener('click', (e) => {
+                        if (e.target.closest('a')) return;
+                        e.stopPropagation();
+                        e.preventDefault();
+                        embedData.containerEl.classList.toggle('is-collapsed');
+                    });
+                } else {
+                    aliasHeader.textContent = displayAlias;
+                }
 
                 const viewContent = view.containerEl.querySelector('.view-content');
                 if (viewContent) {
