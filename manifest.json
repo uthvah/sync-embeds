@@ -3,7 +3,7 @@
   "name": "Sync Embeds",
   "version": "2.0.1",
   "minAppVersion": "0.15.0",
-  "description": "Static embeds, made live. Synced blocks for Obsidian.",
+  "description": "Turn static embeds into live synced blocks.",
   "author": "uthvah",
   "authorUrl": "https://github.com/uthvah",
   "isDesktopOnly": false
