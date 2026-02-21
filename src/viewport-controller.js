@@ -247,14 +247,98 @@ class ViewportController {
                 }
             };
 
+            // Prevent destructive keypresses at the section boundaries
+            const keydownHandler = (event) => {
+                if (!['Backspace', 'Delete', 'Enter'].includes(event.key)) return;
+                if (!embedData.sectionInfo) return;
+
+                const cursor = editor.getCursor();
+                const selection = editor.getSelection();
+
+                if (selection) return; // Allow default behavior for selections
+
+                const { startLine, endLine } = embedData.sectionInfo;
+
+                // Block Enter anywhere on or above the header line. CM6 handles Enter via keydown
+                // directly (beforeinput never fires for it), so this is the only reliable
+                // interception point.
+                if (event.key === 'Enter') {
+                    if (cursor.line <= startLine) {
+                        event.preventDefault();
+                    }
+                    return;
+                }
+
+                if (event.key === 'Backspace') {
+                    // Block Backspace when cursor is on the header line itself (ch=0) or at the
+                    // very start of the first editable line, which would merge into the protected
+                    // header or hidden content above it.
+                    if (cursor.ch === 0 && cursor.line <= startLine + 1) {
+                        event.preventDefault();
+                    }
+                }
+
+                if (event.key === 'Delete') {
+                    // Block Delete anywhere on or above the header line (would remove '#', heading
+                    // text, or content above the section).
+                    if (cursor.line <= startLine) {
+                        event.preventDefault();
+                        return;
+                    }
+                    // Block Delete at the end of the last editable line, which would forward-merge
+                    // content from outside the section.
+                    const lastEditableLine = endLine - 1;
+                    const lastLineLength = editor.getLine(lastEditableLine)?.length || 0;
+                    if (cursor.line === lastEditableLine && cursor.ch === lastLineLength) {
+                        event.preventDefault();
+                    }
+                }
+            };
+
+            // Block all structural input while the cursor is on or before the header line. Used in
+            // addition to keydownHandler, catches any inputType-based events that CM6 does not
+            // suppress via keydown.preventDefault().
+            const BLOCKED_INPUT_TYPES = new Set([
+                'insertText',
+                'insertCompositionText',
+                'insertLineBreak',
+                'insertParagraph',
+                'insertFromDrop',
+                'deleteContentForward',  // Delete key (in case CM6 doesn't swallow keydown)
+                'deleteContentBackward', // Backspace key (same rationale)
+            ]);
+            const beforeInputHandler = (event) => {
+                if (!BLOCKED_INPUT_TYPES.has(event.inputType)) return;
+                if (!embedData.sectionInfo) return;
+
+                const cursor = editor.getCursor();
+                if (cursor.line <= embedData.sectionInfo.startLine) {
+                    event.preventDefault();
+                }
+            };
+
+            // FIXME: It's still possible to create destructive inputs via:
+            //   - Expand a selection from the middle of embed to the beginning of the embed block,
+            //     or from the beginning of the embed to the middle, at which point Enter,
+            //     Backspace, or Delete will apply to the span from the beginning of the source
+            //     document to the cursor position.
+            //   - Selecting and dragging text into the header line causes the text to vanish,
+            //     rather than blocking the event.
+            //   - Moving the cursor to the end of the last line (end of the embed block) still
+            //     allows for Enter or Delete to edit content after the section.
+
             // Use 'input' event which fires AFTER the character is inserted
             cmEditor.addEventListener('input', inputHandler, true);
             cmEditor.addEventListener('paste', pasteHandler, true);
+            cmEditor.addEventListener('keydown', keydownHandler, true);
+            cmEditor.addEventListener('beforeinput', beforeInputHandler, true);
 
             // Cleanup
             component.register(() => {
                 cmEditor.removeEventListener('input', inputHandler, true);
                 cmEditor.removeEventListener('paste', pasteHandler, true);
+                cmEditor.removeEventListener('keydown', keydownHandler, true);
+                cmEditor.removeEventListener('beforeinput', beforeInputHandler, true);
             });
         };
 
