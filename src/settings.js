@@ -14,6 +14,16 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
 
         // === APPEARANCE SECTION ===
         containerEl.createEl('h3', { text: 'Appearance' });
+        
+        new Setting(containerEl)
+            .setName('Render as callout')
+            .setDesc('Render embeds as callouts with sticky headers and collapse functionality')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.renderAsCallout)
+                .onChange(async (value) => {
+                    this.plugin.settings.renderAsCallout = value;
+                    await this.plugin.saveSettings();
+                }));
 
         // Height presets + custom
         new Setting(containerEl)
@@ -155,16 +165,6 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.showFocusHighlight)
                 .onChange(async (value) => {
                     this.plugin.settings.showFocusHighlight = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName('Render as callout')
-            .setDesc('Render embeds as callouts with sticky headers and collapse functionality')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.renderAsCallout)
-                .onChange(async (value) => {
-                    this.plugin.settings.renderAsCallout = value;
                     await this.plugin.saveSettings();
                 }));
 
