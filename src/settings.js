@@ -158,6 +158,16 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        new Setting(containerEl)
+            .setName('Render as callout')
+            .setDesc('Render embeds as callouts with sticky headers and collapse functionality')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.renderAsCallout)
+                .onChange(async (value) => {
+                    this.plugin.settings.renderAsCallout = value;
+                    await this.plugin.saveSettings();
+                }));
+
         // === HEADER MANAGEMENT SECTION ===
         containerEl.createEl('h3', { text: 'Header Management' });
 
@@ -231,6 +241,8 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
                 <li><code>![[Note|Alias{height:500px}]]</code> - Custom height for this embed</li>
                 <li><code>![[Note|Alias{maxHeight:600px}]]</code> - Custom max height</li>
                 <li><code>![[Note|Alias{title:false}]]</code> - Hide title for this embed</li>
+                <li><code>![[Note|Alias{collapse:true}]]</code> - Start embed in collapsed state (requires callout style)</li>
+                <li><code>![[Note|Alias{callout:true}]]</code> - Force callout style for this embed</li>
                 <li><code>![[Note|Alias{height:400px,title:false}]]</code> - Multiple options</li>
             </ul>
             <p><em>Note: Options go inside curly braces before the closing ]]</em></p>
@@ -277,6 +289,7 @@ class SyncEmbedsSettingTab extends PluginSettingTab {
             <ul>
                 <li>Use aliases (text after <code>|</code>) with dynamic patterns for better display</li>
                 <li>Per-embed options override global settings: <code>{height:400px,title:false}</code></li>
+                <li>Use <code>collapse:true</code> to hide embed content by default (requires callout style)</li>
                 <li>Section embeds are fully editable and changes sync immediately</li>
                 <li>Press Tab/Shift+Tab to navigate between embeds</li>
                 <li>Keyboard shortcuts work inside embeds when command interception is enabled</li>
