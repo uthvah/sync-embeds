@@ -80,6 +80,14 @@ module.exports = class SyncEmbedPlugin extends Plugin {
             this.embedManager.processSyncBlock(source, el, ctx);
         });
 
+        // Register markdown post processor for sync callouts
+        this.registerMarkdownPostProcessor((el, ctx) => {
+            const callouts = el.querySelectorAll('.callout[data-callout="sync"]');
+            callouts.forEach(callout => {
+                this.embedManager.processSyncCallout(callout, ctx);
+            });
+        });
+
         // Global focus tracking
         this.registerDomEvent(document, 'focusin', this.trackFocus.bind(this));
         this.registerDomEvent(document, 'focusout', this.trackFocusLoss.bind(this));
