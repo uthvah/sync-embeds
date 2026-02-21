@@ -111,6 +111,21 @@
   border-top: 1px solid var(--background-modifier-border-hover);
 }
 
+/* === SYNC CALLOUTS === */
+.callout[data-callout="sync"].is-synced {
+    background-color: var(--background-primary) !important;
+    padding: 0 !important;
+}
+
+.callout[data-callout="sync"].is-synced > .callout-title {
+    display: none !important;
+}
+
+/* Reset margins for ALL callouts inside sync-embeds to fix app.css 1em override */
+.sync-embed .callout {
+    margin: 0 !important;
+}
+
 /* === NATIVE OBSIDIAN PADDING SYSTEM (REBUILT) === */
 
 /* 1. Hide the view header */

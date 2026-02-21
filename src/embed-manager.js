@@ -77,6 +77,54 @@ class EmbedManager {
         }, 100);
     }
 
+    async processSyncCallout(calloutEl, ctx) {
+        // Find the content area of the callout
+        const contentEl = calloutEl.querySelector('.callout-content');
+        if (!contentEl || contentEl.dataset.synced === 'true') return;
+
+        const internalLinks = contentEl.querySelectorAll('span.internal-embed');
+        let linksToProcess = [];
+
+        internalLinks.forEach(link => {
+            const path = link.getAttribute('src');
+            const alias = link.innerText || link.textContent;
+            if (path) {
+                const linkText = (alias && alias !== path && !alias.includes(path)) 
+                    ? `![[${path}|${alias}]]` 
+                    : `![[${path}]]`;
+                linksToProcess.push(linkText);
+            }
+        });
+
+        if (linksToProcess.length === 0) return;
+
+        // Mark callout as active only when we found links
+        calloutEl.addClass('is-synced');
+        contentEl.dataset.synced = 'true';
+        contentEl.empty();
+
+        // Create container
+        const syncContainer = contentEl.createDiv('sync-container');
+        
+        // Apply CSS custom properties
+        syncContainer.style.setProperty('--sync-embed-height', this.plugin.settings.embedHeight);
+        syncContainer.style.setProperty('--sync-max-height', this.plugin.settings.maxEmbedHeight);
+        syncContainer.style.setProperty('--sync-gap', this.plugin.settings.gapBetweenEmbeds);
+        
+        // Reserve space to avoid Layout Shift, consistent with processSyncBlock
+        const estimatedHeight = linksToProcess.length * 200; // Rough estimate
+        syncContainer.style.minHeight = `${estimatedHeight}px`;
+
+        for (let i = 0; i < linksToProcess.length; i++) {
+            await this.processEmbed(linksToProcess[i], syncContainer, ctx, i > 0);
+        }
+
+        // Remove min-height after all loaded
+        setTimeout(() => {
+            syncContainer.style.minHeight = '';
+        }, 100);
+    }
+
     parseEmbedOptions(line) {
         // Parse options like: ![[note|alias{height:500px,title:false}]]
         const optionsMatch = line.match(/\{([^}]+)\}\]\]$/);
