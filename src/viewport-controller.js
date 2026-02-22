@@ -69,6 +69,11 @@ class ViewportController {
             [data-embed-id="${embedId}"] .cm-line:nth-child(n+${domEndLine + 1}) {
                 display: none !important;
             }
+
+            /* Catch-all to prevent overlapping text in collapsed line numbers */
+            [data-embed-id="${embedId}"] .cm-gutterElement[style*="height: 0px"]:not([style*="visibility: hidden"]) {
+                display: none !important;
+            }
         `;
 
         style.textContent = css;
