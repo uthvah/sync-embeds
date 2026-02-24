@@ -1,8 +1,11 @@
-const { Plugin, MarkdownView } = require('obsidian');
+const { Plugin, MarkdownView, Notice } = require('obsidian');
 const { around } = require('monkey-around');
 const EmbedManager = require('./embed-manager');
 const CommandInterceptor = require('./command-interceptor');
 const SyncEmbedsSettingTab = require('./settings');
+const QueryProcessor = require('./query-processor');
+const BlockExtractor = require('./block-extractor');
+const StaticRenderer = require('./static-renderer');
 
 const DEFAULT_SETTINGS = {
     embedHeight: 'auto',
@@ -27,6 +30,9 @@ module.exports = class SyncEmbedPlugin extends Plugin {
         this.commandInterceptor = null;
         this.currentFocusedEmbed = null;
         this.uninstallers = [];
+        this.queryProcessor = null;
+        this.blockExtractor = null;
+        this.staticRenderer = null;
     }
 
     async onload() {
@@ -35,6 +41,9 @@ module.exports = class SyncEmbedPlugin extends Plugin {
         // Initialize managers
         this.embedManager = new EmbedManager(this);
         this.commandInterceptor = new CommandInterceptor(this);
+        this.queryProcessor = new QueryProcessor(this);
+        this.blockExtractor = new BlockExtractor(this);
+        this.staticRenderer = new StaticRenderer(this);
         
         // Setup command interception with monkey-around
         if (this.settings.enableCommandInterception) {
@@ -81,6 +90,10 @@ module.exports = class SyncEmbedPlugin extends Plugin {
             this.embedManager.processSyncBlock(source, el, ctx);
         });
 
+        this.registerMarkdownCodeBlockProcessor('sync-query', async (source, el, ctx) => {
+            await this.processSyncQueryBlock(source, el, ctx);
+        });
+
         // Global focus tracking
         this.registerDomEvent(document, 'focusin', this.trackFocus.bind(this));
         this.registerDomEvent(document, 'focusout', this.trackFocusLoss.bind(this));
@@ -93,6 +106,124 @@ module.exports = class SyncEmbedPlugin extends Plugin {
         
         // Log successful load
         this.log('Sync Embeds plugin loaded successfully');
+    }
+
+    async processSyncQueryBlock(source, el, ctx) {
+        try {
+            const { config, files } = await this.queryProcessor.execute(source, ctx);
+            const results = await this.blockExtractor.extract(files, config.extract, config.filter);
+            el.empty();
+            const container = el.createDiv();
+            let activeLiveState = null;
+
+            const activateResult = async (result, staticEl) => {
+                if (activeLiveState?.embedData) {
+                    this.embedManager.destroyEmbed(activeLiveState.embedData);
+                    activeLiveState.staticEl.style.display = '';
+                    activeLiveState = null;
+                }
+
+                const resolvedBounds = await this.resolveBlockBounds(result);
+                if (!resolvedBounds) return;
+
+                staticEl.style.display = 'none';
+                const liveContainer = container.createDiv('sync-embed');
+                const placeholder = liveContainer.createDiv('sync-embed-placeholder');
+                placeholder.setText(`Loading ${result.file.basename}...`);
+
+                const embedData = await this.embedManager.loadEmbed(
+                    liveContainer,
+                    result.file,
+                    null,
+                    `${result.file.basename}`,
+                    ctx,
+                    placeholder,
+                    {},
+                    'block',
+                    resolvedBounds
+                );
+
+                if (!embedData) {
+                    staticEl.style.display = '';
+                    liveContainer.remove();
+                    return;
+                }
+
+                activeLiveState = { result, staticEl, liveContainer, embedData };
+
+                const onBlurCleanup = async () => {
+                    if (liveContainer.contains(document.activeElement)) return;
+
+                    this.embedManager.destroyEmbed(embedData);
+                    liveContainer.remove();
+                    const refreshed = await this.refreshResult(result);
+                    if (refreshed) {
+                        result.originalText = refreshed.originalText;
+                        result.blockId = refreshed.blockId;
+                    }
+
+                    await this.staticRenderer.renderResultIntoElement(staticEl, result, ctx);
+                    staticEl.style.display = '';
+                    activeLiveState = null;
+                    liveContainer.removeEventListener('focusout', focusoutHandler, true);
+                };
+
+                const focusoutHandler = () => setTimeout(onBlurCleanup, 50);
+                liveContainer.addEventListener('focusout', focusoutHandler, true);
+            };
+
+            await this.staticRenderer.render(container, results, ctx, activateResult);
+        } catch (error) {
+            const message = `sync-query error: ${error.message}`;
+            el.createDiv('sync-embed-error').setText(message);
+            console.error('Sync Embeds:', message, error);
+        }
+    }
+
+    async resolveBlockBounds(result) {
+        const content = await this.app.vault.cachedRead(result.file);
+        const lines = content.split('\n');
+
+        if (result.blockId) {
+            const cache = this.app.metadataCache.getFileCache(result.file);
+            const blockPosition = cache?.blocks?.[result.blockId]?.position;
+            if (blockPosition) {
+                return { startLine: blockPosition.start.line, endLine: blockPosition.end.line + 1 };
+            }
+        }
+
+        const indices = [];
+        let startAt = 0;
+        while (true) {
+            const index = content.indexOf(result.originalText, startAt);
+            if (index === -1) break;
+            indices.push(index);
+            startAt = index + result.originalText.length;
+        }
+
+        if (indices.length === 0) {
+            new Notice('Could not resolve block location.');
+            return null;
+        }
+
+        if (indices.length > 1) {
+            new Notice('Duplicate block text found. Please add a ^block-id to the source file to edit.');
+            return null;
+        }
+
+        const before = content.slice(0, indices[0]);
+        const startLine = before ? before.split('\n').length - 1 : 0;
+        const blockLineCount = result.originalText.split('\n').length;
+        const endLine = Math.min(lines.length, startLine + blockLineCount);
+        return { startLine, endLine };
+    }
+
+    async refreshResult(result) {
+        const updated = await this.blockExtractor.extract([result.file], 'any', '');
+        if (result.blockId) {
+            return updated.find(item => item.blockId === result.blockId) || null;
+        }
+        return updated.find(item => item.originalText === result.originalText) || null;
     }
 
     onunload() {

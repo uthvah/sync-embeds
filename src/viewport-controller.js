@@ -28,6 +28,22 @@ class ViewportController {
         this.scrollToSection(embedData);
     }
 
+    async setupBlockViewport(embedData, startLine, endLine) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        embedData.sectionInfo = {
+            startLine,
+            endLine,
+            headerLevel: 0
+        };
+        embedData.viewportActive = true;
+
+        this.applyViewportRestriction(embedData);
+        this.setupBoundaryProtection(embedData);
+        this.setupContentConstraints(embedData);
+        this.scrollToSection(embedData);
+    }
+
     applyViewportRestriction(embedData) {
         const { view } = embedData;
         
@@ -138,6 +154,7 @@ class ViewportController {
     setupHeaderInputInterception(embedData) {
         const { view, editor, component } = embedData;
         const { headerLevel } = embedData.sectionInfo;
+        if (!headerLevel) return;
 
         let lastNoticeTime = 0;
         const noticeDebounce = 5000;
@@ -322,6 +339,16 @@ class ViewportController {
 
     updateViewportImmediately(embedData) {
         if (!embedData.viewportActive) return;
+
+        if (embedData.mode === 'block' && embedData.blockBounds) {
+            embedData.sectionInfo = {
+                startLine: embedData.blockBounds.startLine,
+                endLine: embedData.blockBounds.endLine,
+                headerLevel: 0
+            };
+            if (embedData.viewportStyle) this.updateViewportCSS(embedData, embedData.viewportStyle);
+            return;
+        }
 
         const currentContent = embedData.editor.getValue();
         const newSectionInfo = this.findSectionBounds(currentContent, embedData.section);

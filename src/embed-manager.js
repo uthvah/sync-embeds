@@ -160,7 +160,7 @@ class EmbedManager {
         }
     }
 
-    async loadEmbed(embedContainer, file, section, alias, ctx, placeholder, customOptions = {}) {
+    async loadEmbed(embedContainer, file, section, alias, ctx, placeholder, customOptions = {}, mode = 'section', blockBounds = null) {
         try {
             const component = new Component();
             const leaf = new WorkspaceLeaf(this.plugin.app);
@@ -174,7 +174,9 @@ class EmbedManager {
                 component,
                 leaf,
                 customOptions,
-                sourcePath: ctx.sourcePath
+                sourcePath: ctx.sourcePath,
+                mode,
+                blockBounds
             };
 
             component.addChild(new (class extends Component {
@@ -214,7 +216,7 @@ class EmbedManager {
             const renderAsCallout = customOptions.callout !== undefined ? customOptions.callout : this.plugin.settings.renderAsCallout;
             const headerTitle = alias || (section ? `${file.basename} > ${section}` : file.basename);
 
-            if (section) {
+            if (mode === 'section' && section) {
                 const content = view.editor.getValue();
                 const sectionInfo = this.viewportController.findSectionBounds(content, section);
 
@@ -229,6 +231,8 @@ class EmbedManager {
                 }
 
                 await this.viewportController.setupSectionViewport(embedData);
+            } else if (mode === 'block' && blockBounds) {
+                await this.viewportController.setupBlockViewport(embedData, blockBounds.startLine, blockBounds.endLine);
             }
 
             // UNIFIED HEADER/TITLE LOGIC
@@ -240,8 +244,8 @@ class EmbedManager {
             }
 
             // PROPERTIES LOGIC
-            if (section) {
-                this.hideProperties(embedData); // Sections shouldn't have properties
+            if (mode === 'block' || section) {
+                this.hideProperties(embedData); // Sections/blocks shouldn't have properties
             } else if (this.plugin.settings.collapsePropertiesByDefault) {
                 this.setupPropertiesCollapse(embedData); // Whole notes conditionally collapse natively
             }
@@ -249,12 +253,25 @@ class EmbedManager {
             placeholder.replaceWith(view.containerEl);
             embedContainer.removeClass('sync-embed-loading');
             ctx.addChild(component);
+            return embedData;
 
         } catch (error) {
             console.error('Sync Embeds: Error loading embed:', error);
             placeholder.setText(`Error: ${error.message}`);
             placeholder.addClass('sync-embed-error');
+            return null;
         }
+    }
+
+    destroyEmbed(embedData) {
+        if (!embedData) return;
+        this.viewportController.cleanupViewport(embedData);
+        if (embedData.component) {
+            embedData.component.unload();
+        } else if (embedData.leaf) {
+            embedData.leaf.detach();
+        }
+        this.activeEmbeds.delete(embedData);
     }
 
     setupHeaderUI(embedData, displayTitle, renderAsCallout, isSection) {
