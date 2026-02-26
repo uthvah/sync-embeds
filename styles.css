@@ -30,11 +30,6 @@
   border-radius: 4px; /* Optional rounding for callouts */
 }
 
-/* Compensate top padding when in callout mode to match bottom padding */
-.sync-embed.is-callout-style .cm-content {
-  padding-top: 12px !important;
-}
-
 /* === UNIFIED UI HEADER === */
 .sync-embed-header {
   font-size: var(--inline-title-size, var(--h1-size, 2em));
@@ -165,10 +160,15 @@
 /* 16px padding creates a flush left edge */
 .sync-embed .cm-content {
   background-color: transparent !important;
-  padding-top: 12px !important;
+  /* padding-top: 12px !important; */
   padding-bottom: 12px !important;
   padding-left: 16px !important; 
   padding-right: 16px !important;
+}
+
+/* Applying general padding to the container keeps both line numbers and content vertically aligned */
+.sync-embed .cm-contentContainer {
+  padding-top: 12px !important;
 }
 
 .sync-embed .markdown-source-view.mod-cm6 .cm-editor {
