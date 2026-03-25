@@ -1,9 +1,9 @@
 {
   "id": "sync-embeds",
   "name": "Sync Embeds",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "minAppVersion": "0.15.0",
-  "description": "Create fully editable, note embeds with advanced features including section viewports and dynamic paths.",
+  "description": "Turn static embeds into live synced blocks.",
   "author": "uthvah",
   "authorUrl": "https://github.com/uthvah",
   "isDesktopOnly": false

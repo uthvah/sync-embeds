@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS = {
     maxEmbedHeight: 'none',
     collapsePropertiesByDefault: true,
     showInlineTitle: true,
+    renderAsCallout: false,
     enableCommandInterception: true,
     gapBetweenEmbeds: '16px',
     lazyLoadThreshold: '100px',

@@ -1,13 +1,13 @@
 {
-  "name": "sync-embeds",
+  "name": "obsidian-sync-embeds",
   "version": "2.0.0",
-  "description": "Create fully editable, note embeds with advanced features including section viewports and dynamic paths.",
+  "description": "Create fully editable, live-synced note embeds",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "node esbuild.config.mjs production"
+    "build": "NODE_ENV=production node esbuild.config.mjs"
   },
-  "keywords": [],
+  "keywords": ["obsidian", "plugin", "embeds"],
   "author": "uthvah",
   "license": "MIT",
   "devDependencies": {
@@ -17,6 +17,6 @@
     "obsidian": "latest"
   },
   "dependencies": {
-    "monkey-around": "^2.3.0"
+    "monkey-around": "^3.0.0"
   }
 }
