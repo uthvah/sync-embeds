@@ -33,7 +33,7 @@ class ViewportController {
 
     applyViewportRestriction(embedData) {
         const { view } = embedData;
-        
+
         const style = document.createElement('style');
         style.className = 'sync-viewport-style';
 
@@ -47,7 +47,7 @@ class ViewportController {
     }
 
     updateViewportCSS(embedData, style) {
-        const { sectionInfo, embedId, propertiesLineCount = 0, file } = embedData;
+        const { sectionInfo, embedId, file } = embedData;
         const { startLine, endLine } = sectionInfo;
 
         // Frontmatter DOM Offset compensation
@@ -62,22 +62,14 @@ class ViewportController {
         const domStartLine = Math.max(0, startLine - domOffset);
         const domEndLine = Math.max(0, endLine - domOffset);
 
-      
-        let adjustedStartLine = domStartLine - propertiesLineCount;
-        let adjustedEndLine = domEndLine - propertiesLineCount;
-        
-        if (hideHeader) {
-            adjustedStartLine += 1;
-        }
-
         const css = `
             /* Hide all lines BEFORE and INCLUDING the section header */
-            [data-embed-id="${embedId}"] .cm-line:nth-child(-n+${adjustedStartLine + 1}) {
+            [data-embed-id="${embedId}"] .cm-line:nth-child(-n+${domStartLine + 1}) {
                 display: none !important;
             }
 
             /* Hide all lines AFTER the section */
-            [data-embed-id="${embedId}"] .cm-line:nth-child(n+${adjustedEndLine + 1}) {
+            [data-embed-id="${embedId}"] .cm-line:nth-child(n+${domEndLine + 1}) {
                 display: none !important;
             }
 
@@ -247,27 +239,7 @@ class ViewportController {
     setupContentConstraints(embedData) {
         const { view, editor, component } = embedData;
         let isProgrammaticUpdate = false;
-        
-        // CRITICAL FIX: Update viewport IMMEDIATELY before visible changes
-        const updateViewportImmediately = () => {
-            if (!embedData.viewportActive) return;
-            
-            const currentContent = editor.getValue();
-            const newSectionInfo = this.findSectionBounds(currentContent, embedData.section);
-            
-            if (newSectionInfo.startLine !== -1) {
-                embedData.sectionInfo = newSectionInfo;
-                
-                // recalculate properties line count on content change
-                embedData.propertiesLineCount = this.countPropertiesLines(currentContent);
-                
-                // Update CSS synchronously to prevent flashing
-                if (embedData.viewportStyle) {
-                    this.updateViewportCSS(embedData, embedData.viewportStyle);
-                }
-            }
-        };
-        
+
         // Force cursor strictly inside bounds (preventing up/down arrow drifting)
         const enforceCursorBounds = () => {
             if (isProgrammaticUpdate || !embedData.viewportActive || !embedData.sectionInfo) return;
@@ -330,14 +302,14 @@ class ViewportController {
                 const scrollTop = cmScroller.scrollTop;
                 const lineHeight = editor.defaultTextHeight || 20;
                 const firstVisibleLine = Math.floor(scrollTop / lineHeight);
-                
+
                 // Frontmatter DOM Offset compensation for scrolling bounds
                 let domOffset = 0;
                 const fileCache = this.plugin.app.metadataCache.getFileCache(embedData.file);
                 if (fileCache && fileCache.frontmatterPosition) {
                     domOffset = fileCache.frontmatterPosition.end.line;
                 }
-                
+
                 const domStartLine = Math.max(0, embedData.sectionInfo.startLine - domOffset);
                 const domEndLine = Math.max(0, embedData.sectionInfo.endLine - domOffset);
 
@@ -414,35 +386,6 @@ class ViewportController {
 
     escapeRegExp(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    countPropertiesLines(content) {
-        // Count the number of lines used by frontmatter/properties
-        // Properties are wrapped in --- markers at the start of the file
-        const lines = content.split('\n');
-        
-        // Check if file starts with properties
-        if (lines.length === 0 || lines[0] !== '---') {
-            return 0;
-        }
-        
-        // Find the closing --- marker
-        let propertiesEndLine = -1;
-        for (let i = 1; i < lines.length; i++) {
-            if (lines[i] === '---') {
-                propertiesEndLine = i;
-                break;
-            }
-        }
-        
-        if (propertiesEndLine === -1) {
-            // Invalid frontmatter, no closing marker
-            return 0;
-        }
-        
-        // Return the number of lines including both --- markers
-        // These lines are NOT rendered as .cm-line elements
-        return propertiesEndLine + 1;
     }
 
     cleanupViewport(embedData) {

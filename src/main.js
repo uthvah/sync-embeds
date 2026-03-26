@@ -16,8 +16,6 @@ const DEFAULT_SETTINGS = {
     loadAllOnPageLoad: false,
     showFocusHighlight: true,
     showHeaderHints: true,           // NEW: Header hints (enforcement is always on)
-    hideSectionHeaders: false,       // NEW: Hide headers in section embeds
-    showPropertiesToggle: true,      // NEW: Show properties collapse toggle button
     debugMode: false
 };
 
@@ -34,11 +32,11 @@ module.exports = class SyncEmbedPlugin extends Plugin {
 
     async onload() {
         await this.loadSettings();
-        
+
         // Initialize managers
         this.embedManager = new EmbedManager(this);
         this.commandInterceptor = new CommandInterceptor(this);
-        
+
         // Setup command interception with monkey-around
         if (this.settings.enableCommandInterception) {
             this.setupCommandInterception();
@@ -90,26 +88,26 @@ module.exports = class SyncEmbedPlugin extends Plugin {
 
         // Add settings tab
         this.addSettingTab(new SyncEmbedsSettingTab(this.app, this));
-        
+
         // Apply focus highlight setting
         this.updateFocusHighlight();
-        
+
         // Log successful load
         this.log('Sync Embeds plugin loaded successfully');
     }
 
     onunload() {
         this.log('Unloading Sync Embeds plugin');
-        
+
         // Clean up command interception
         this.uninstallers.forEach(uninstall => uninstall());
         this.uninstallers = [];
-        
+
         // Clean up managers
         if (this.embedManager) {
             this.embedManager.cleanup();
         }
-        
+
         this.currentFocusedEmbed = null;
     }
 
@@ -121,7 +119,7 @@ module.exports = class SyncEmbedPlugin extends Plugin {
             { level: 5, name: 'Heading 5', key: '5' },
             { level: 6, name: 'Heading 6', key: '6' },
         ];
-        
+
         headerLevels.forEach(({ level, name, key }) => {
             this.addCommand({
                 id: `insert-header-${level}`,
@@ -129,13 +127,13 @@ module.exports = class SyncEmbedPlugin extends Plugin {
                 editorCallback: (editor, view) => {
                     // Check if we're in a sync embed
                     const focusedEmbed = this.getFocusedEmbed();
-                    
+
                     if (focusedEmbed) {
                         // Use our custom handler
                         const handler = this.commandInterceptor.insertHeaderCommand(level);
                         return handler(focusedEmbed);
                     }
-                    
+
                     // Fall back to normal behavior for non-embed editing
                     this.commandInterceptor.insertHeader({ editor }, level);
                 },
@@ -147,7 +145,7 @@ module.exports = class SyncEmbedPlugin extends Plugin {
                 ]
             });
         });
-        
+
         this.log('Registered header commands with default hotkeys (Alt+2-6)');
     }
 
@@ -159,7 +157,7 @@ module.exports = class SyncEmbedPlugin extends Plugin {
                     const plugin = this;
                     return function(command, ...args) {
                         const focusedEmbed = plugin.getFocusedEmbed();
-                        
+
                         // If embed is focused, check if we should intercept
                         if (focusedEmbed) {
                             // Check for our header commands first
@@ -170,17 +168,17 @@ module.exports = class SyncEmbedPlugin extends Plugin {
                                 const handler = plugin.commandInterceptor.insertHeaderCommand(level);
                                 return handler(focusedEmbed);
                             }
-                            
+
                             // Check if we have a custom handler
                             if (plugin.commandInterceptor.hasHandler(command.id)) {
                                 plugin.log(`Intercepting command: ${command.id}`);
                                 return plugin.commandInterceptor.handle(command.id, focusedEmbed, ...args);
                             }
-                            
+
                             // For commands we don't handle, let them execute on the embed's editor
                             // This ensures ALL hotkeys work, including custom user-defined ones
                             plugin.log(`Passing through command to embed: ${command.id}`);
-                            
+
                             // Check if command has a callback that expects an editor
                             if (command.editorCallback && focusedEmbed.editor) {
                                 try {
@@ -191,7 +189,7 @@ module.exports = class SyncEmbedPlugin extends Plugin {
                                 }
                             }
                         }
-                        
+
                         return old.call(this, command, ...args);
                     };
                 }
@@ -213,7 +211,7 @@ module.exports = class SyncEmbedPlugin extends Plugin {
                 }
             });
             this.uninstallers.push(getActiveViewUninstall);
-            
+
             // Patch getActiveViewOfType on workspace.activeLeaf as well
             const getActiveLeafUninstall = around(this.app.workspace, {
                 activeLeaf: {
@@ -231,7 +229,7 @@ module.exports = class SyncEmbedPlugin extends Plugin {
                 }
             });
             this.uninstallers.push(getActiveLeafUninstall);
-            
+
             this.log('Command interception setup complete');
         } catch (error) {
             console.error('Sync Embeds: Failed to setup command interception:', error);
@@ -285,12 +283,7 @@ module.exports = class SyncEmbedPlugin extends Plugin {
             container.style.setProperty('--sync-max-height', this.settings.maxEmbedHeight);
             container.style.setProperty('--sync-gap', this.settings.gapBetweenEmbeds);
         });
-        
-        // Update viewport CSS for section embeds (header visibility)
-        if (this.embedManager) {
-            this.embedManager.refreshViewportCSS();
-        }
-        
+
         this.log('Refreshed all embeds with new settings');
     }
 

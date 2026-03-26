@@ -149,10 +149,8 @@ class EmbedManager {
           
             // Check if we should load all embeds on page load
             if (this.plugin.settings.loadAllOnPageLoad) {
-                // Load immediately without intersection observer
-                requestAnimationFrame(() => {
-                    this.loadEmbed(embedContainer, file, section, displayAlias, ctx, placeholder, options);
-                });
+                await this.loadEmbed(embedContainer, file, section, displayAlias, ctx, placeholder, options);
+                await new Promise(r => setTimeout(r, 50));
             } else {
                 // Aggressive lazy loading to prevent scrollbar jumps
                 const observer = new IntersectionObserver((entries) => {
