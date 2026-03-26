@@ -3,11 +3,11 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
   background: var(--background-primary);
-  margin: 0px 0px;
+  margin: 12px 0px;
   display: flex;
   flex-direction: column;
   gap: var(--sync-gap, 16px);
-  padding: 12px;
+  padding: 16px;
 }
 
 /* === EMBED WRAPPER === */
@@ -39,13 +39,13 @@
   font-family: var(--inline-title-font, var(--h1-font, var(--font-text)));
   font-variant: var(--h1-variant, normal);
   letter-spacing: var(--h1-letter-spacing, normal);
-  
+
   /* Matches body content padding */
   padding-top: 14px !important;
   padding-left: 16px !important;
   padding-right: 16px !important;
   margin-bottom: 0;
-  
+
   user-select: none !important;
   cursor: default !important;
   background: transparent !important;
@@ -64,11 +64,11 @@
     position: sticky;
     top: 0;
     z-index: 1000;
-    background-color: var(--background-primary) !important; 
-    
+    background-color: var(--background-primary) !important;
+
     /* ALIGNMENT: 16px left to match body, 40px right for fold icon */
     padding: 8px 40px 8px 16px !important;
-    
+
     font-size: var(--inline-title-size);
     display: flex !important;
     align-items: center !important;
@@ -162,7 +162,7 @@
   background-color: transparent !important;
   /* padding-top: 12px !important; */
   padding-bottom: 12px !important;
-  padding-left: 16px !important; 
+  padding-left: 16px !important;
   padding-right: 16px !important;
 }
 
@@ -385,7 +385,7 @@ body.sync-embeds-no-focus-highlight .sync-embed:focus-within {
   .sync-embed-gap {
     padding-top: 12px;
   }
-  
+
   .sync-embed-header {
     font-size: calc(var(--inline-title-size, var(--h1-size, 2em)) * 0.85);
   }
@@ -411,11 +411,11 @@ body.sync-embeds-no-focus-highlight .sync-embed:focus-within {
   .sync-container {
     border-width: 2px;
   }
-  
+
   .sync-embed:focus-within {
     outline-width: 3px;
   }
-  
+
   .sync-embed-error {
     border-width: 2px;
   }
@@ -426,12 +426,12 @@ body.sync-embeds-no-focus-highlight .sync-embed:focus-within {
     animation: none;
     opacity: 0.8;
   }
-  
+
   .sync-embed,
   .sync-embed::-webkit-scrollbar-thumb {
     transition: none;
   }
-  
+
   .sync-embed .cm-scroller {
     scroll-behavior: auto;
   }
@@ -443,12 +443,12 @@ body.sync-embeds-no-focus-highlight .sync-embed:focus-within {
     border: 1px solid #ccc;
     page-break-inside: avoid;
   }
-  
+
   .sync-embed {
     max-height: none !important;
     overflow: visible !important;
   }
-  
+
   .metadata-container.is-collapsed .metadata-content {
     display: block;
   }
