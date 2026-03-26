@@ -18,10 +18,7 @@ class ViewportController {
             return;
         }
 
-        // Count properties/frontmatter lines to adjust viewport
-        const propertiesLineCount = this.countPropertiesLines(content);
         embedData.sectionInfo = sectionInfo;
-        embedData.propertiesLineCount = propertiesLineCount;
         embedData.viewportActive = true;
 
         this.applyViewportRestriction(embedData);
