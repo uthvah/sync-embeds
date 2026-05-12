@@ -1,4 +1,41 @@
 const { Notice } = require('obsidian');
+const { StateEffect, StateField } = require('@codemirror/state');
+const { Decoration, EditorView } = require('@codemirror/view');
+
+const setSyncViewportRanges = StateEffect.define();
+
+const syncViewportField = StateField.define({
+    create() {
+        return Decoration.none;
+    },
+
+    update(decorations, transaction) {
+        decorations = decorations.map(transaction.changes);
+
+        for (const effect of transaction.effects) {
+            if (effect.is(setSyncViewportRanges)) {
+                decorations = buildViewportDecorations(effect.value);
+            }
+        }
+
+        return decorations;
+    },
+
+    provide: field => EditorView.decorations.from(field)
+});
+
+function buildViewportDecorations(ranges) {
+    if (!Array.isArray(ranges)) return Decoration.none;
+
+    const decorations = [];
+    for (const range of ranges) {
+        if (range && range.to > range.from) {
+            decorations.push(Decoration.replace({ block: true }).range(range.from, range.to));
+        }
+    }
+
+    return Decoration.set(decorations, true);
+}
 
 class ViewportController {
     constructor(plugin) {
@@ -30,6 +67,30 @@ class ViewportController {
 
     applyViewportRestriction(embedData) {
         const { view } = embedData;
+
+        const cmView = this.getCodeMirrorView(embedData);
+        if (cmView) {
+            embedData.cmView = cmView;
+            embedData.usesDecorationViewport = true;
+
+            if (!cmView.state.field(syncViewportField, false)) {
+                cmView.dispatch({
+                    effects: StateEffect.appendConfig.of(syncViewportField)
+                });
+            }
+
+            this.updateViewportDecorations(embedData);
+
+            embedData.component.register(() => {
+                if (embedData.cmView) {
+                    embedData.cmView.dispatch({
+                        effects: setSyncViewportRanges.of(null)
+                    });
+                }
+            });
+
+            return;
+        }
         
         const style = document.createElement('style');
         style.className = 'sync-viewport-style';
@@ -41,6 +102,38 @@ class ViewportController {
         this.updateViewportCSS(embedData, style);
         view.containerEl.appendChild(style);
         embedData.viewportStyle = style;
+    }
+
+    getCodeMirrorView(embedData) {
+        return embedData.editor?.cm || embedData.view?.editor?.cm || null;
+    }
+
+    updateViewportDecorations(embedData) {
+        const cmView = embedData.cmView || this.getCodeMirrorView(embedData);
+        if (!cmView || !embedData.sectionInfo) return false;
+
+        const ranges = this.getViewportDecorationRanges(cmView.state.doc, embedData.sectionInfo);
+        cmView.dispatch({
+            effects: setSyncViewportRanges.of(ranges)
+        });
+
+        return true;
+    }
+
+    getViewportDecorationRanges(doc, sectionInfo) {
+        const { startLine, endLine } = sectionInfo;
+        const ranges = [];
+
+        const headerLine = doc.line(startLine + 1);
+        const afterHeader = headerLine.number < doc.lines ? headerLine.to + 1 : headerLine.to;
+        ranges.push({ from: 0, to: afterHeader });
+
+        if (endLine < doc.lines) {
+            const nextSectionLine = doc.line(endLine + 1);
+            ranges.push({ from: nextSectionLine.from, to: doc.length });
+        }
+
+        return ranges;
     }
 
     updateViewportCSS(embedData, style) {
@@ -265,18 +358,20 @@ class ViewportController {
                 return;
             }
 
-            cmContent.addEventListener('mouseup', enforceCursorBounds);
-            cmContent.addEventListener('focusin', enforceCursorBounds);
-            cmContent.addEventListener('keyup', (e) => {
+            const keyupHandler = (e) => {
                 if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)) {
                     enforceCursorBounds();
                 }
-            });
+            };
+
+            cmContent.addEventListener('mouseup', enforceCursorBounds);
+            cmContent.addEventListener('focusin', enforceCursorBounds);
+            cmContent.addEventListener('keyup', keyupHandler);
 
             component.register(() => {
                 cmContent.removeEventListener('mouseup', enforceCursorBounds);
                 cmContent.removeEventListener('focusin', enforceCursorBounds);
-                cmContent.removeEventListener('keyup', enforceCursorBounds);
+                cmContent.removeEventListener('keyup', keyupHandler);
             });
         };
 
@@ -291,6 +386,8 @@ class ViewportController {
                 }
             })
         );
+
+        if (embedData.usesDecorationViewport) return;
 
         const cmScroller = view.containerEl.querySelector('.cm-scroller');
         if (cmScroller) {
@@ -336,6 +433,8 @@ class ViewportController {
 
             if (embedData.viewportStyle) {
                 this.updateViewportCSS(embedData, embedData.viewportStyle);
+            } else if (embedData.usesDecorationViewport) {
+                this.updateViewportDecorations(embedData);
             }
         }
     }
