@@ -1,7 +1,7 @@
 {
   "id": "sync-embeds",
   "name": "Sync Embeds",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "minAppVersion": "0.15.0",
   "description": "Turn static embeds into live synced blocks.",
   "author": "uthvah",
