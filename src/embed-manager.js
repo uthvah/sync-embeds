@@ -33,6 +33,15 @@ class EmbedManager {
         return null;
     }
 
+    refreshViewportCSS() {
+        // Update viewport CSS for all active section embeds
+        this.activeEmbeds.forEach(embedData => {
+            if (embedData.viewportActive && embedData.viewportStyle) {
+                this.viewportController.updateViewportCSS(embedData, embedData.viewportStyle);
+            }
+        });
+    }
+
     async processSyncBlock(source, el, ctx) {
         el.empty();
         const syncContainer = el.createDiv('sync-container');
@@ -137,22 +146,30 @@ class EmbedManager {
 
             const renderAsCallout = options.callout !== undefined ? options.callout : this.plugin.settings.renderAsCallout;
             if (renderAsCallout) embedContainer.addClass('is-callout-style');
-
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        observer.disconnect();
-                        requestAnimationFrame(() => {
-                            this.loadEmbed(embedContainer, file, section, displayAlias, ctx, placeholder, options);
-                        });
-                    }
+          
+            // Check if we should load all embeds on page load
+            if (this.plugin.settings.loadAllOnPageLoad) {
+                await this.loadEmbed(embedContainer, file, section, displayAlias, ctx, placeholder, options);
+                await new Promise(r => setTimeout(r, 50));
+            } else {
+                // Aggressive lazy loading to prevent scrollbar jumps
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            observer.disconnect();
+                            // Small delay to ensure smooth scrolling
+                            requestAnimationFrame(() => {
+                                this.loadEmbed(embedContainer, file, section, displayAlias, ctx, placeholder, options);
+                            });
+                        }
+                    });
+                }, {
+                    rootMargin: this.plugin.settings.lazyLoadThreshold,
+                    threshold: 0.01 // Start loading as soon as 1% is visible
                 });
-            }, {
-                rootMargin: this.plugin.settings.lazyLoadThreshold,
-                threshold: 0.01 
-            });
 
-            observer.observe(embedContainer);
+                observer.observe(embedContainer);
+            }
 
         } catch (error) {
             console.error('Sync Embeds: Error processing embed:', error);
