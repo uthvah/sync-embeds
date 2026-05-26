@@ -48,9 +48,6 @@ This means you are interacting with a *real* editor instance. When editing a spe
 
 Sync Embeds is officially available in the Obsidian Community Store!
 
-👉 **![Click here to 1-click install directly in Obsidian](obsidian://show-plugin?id=sync-embeds)**
-
-*Or install manually via the app:*
 1. Open Obsidian **Settings** → **Community Plugins**.
 2. Click **Browse** and search for `Sync Embeds`.
 3. Click **Install**, then **Enable**.
