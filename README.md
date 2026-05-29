@@ -15,7 +15,7 @@
 
 **Sync Embeds** transforms standard Obsidian transclusions into live, editable, two-way synced blocks. Edit any note (or specific header section) directly from where you embed it, without ever needing to open the source file.
 
-Trusted by over 14,000 users, it's designed to feel seamless, stable, and completely native to the Obsidian experience.
+Trusted by over 15,000 users, it's designed to feel seamless, stable, and completely native to the Obsidian experience.
 
 https://github.com/user-attachments/assets/68d20937-b4a0-4790-9aa8-34f670e42893
 
