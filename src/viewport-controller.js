@@ -30,7 +30,7 @@ class ViewportController {
 
     applyViewportRestriction(embedData) {
         const { view } = embedData;
-        
+
         const style = document.createElement('style');
         style.className = 'sync-viewport-style';
 
@@ -75,7 +75,6 @@ class ViewportController {
                 display: none !important;
             }
         `;
-
         style.textContent = css;
     }
 
@@ -300,14 +299,14 @@ class ViewportController {
                 const scrollTop = cmScroller.scrollTop;
                 const lineHeight = editor.defaultTextHeight || 20;
                 const firstVisibleLine = Math.floor(scrollTop / lineHeight);
-                
+
                 // Frontmatter DOM Offset compensation for scrolling bounds
                 let domOffset = 0;
                 const fileCache = this.plugin.app.metadataCache.getFileCache(embedData.file);
                 if (fileCache && fileCache.frontmatterPosition) {
                     domOffset = fileCache.frontmatterPosition.end.line;
                 }
-                
+
                 const domStartLine = Math.max(0, embedData.sectionInfo.startLine - domOffset);
                 const domEndLine = Math.max(0, embedData.sectionInfo.endLine - domOffset);
 
