@@ -211,23 +211,29 @@ module.exports = class SyncEmbedPlugin extends Plugin {
             });
             this.uninstallers.push(getActiveViewUninstall);
             
-            // Patch getActiveViewOfType on workspace.activeLeaf as well
-            const getActiveLeafUninstall = around(this.app.workspace, {
-                activeLeaf: {
-                    get: (old) => {
-                        const plugin = this;
-                        return function() {
-                            const focusedEmbed = plugin.getFocusedEmbed();
-                            if (focusedEmbed && focusedEmbed.leaf) {
-                                plugin.log('Returning embed leaf as active leaf');
-                                return focusedEmbed.leaf;
-                            }
-                            return old.call(this);
-                        };
+            // Patch workspace.activeLeaf getter to return the focused embed's leaf.
+            // `around` only supports method wrapping, not property descriptors, so we
+            // use Object.defineProperty directly here.
+            const workspace = this.app.workspace;
+            const origLeafDesc = Object.getOwnPropertyDescriptor(workspace, 'activeLeaf')
+                || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(workspace), 'activeLeaf');
+            if (origLeafDesc) {
+                const plugin = this;
+                const origGet = origLeafDesc.get;
+                Object.defineProperty(workspace, 'activeLeaf', {
+                    ...origLeafDesc,
+                    configurable: true,
+                    get() {
+                        const focusedEmbed = plugin.getFocusedEmbed();
+                        if (focusedEmbed && focusedEmbed.leaf) {
+                            plugin.log('Returning embed leaf as active leaf');
+                            return focusedEmbed.leaf;
+                        }
+                        return origGet ? origGet.call(this) : undefined;
                     }
-                }
-            });
-            this.uninstallers.push(getActiveLeafUninstall);
+                });
+                this.uninstallers.push(() => Object.defineProperty(workspace, 'activeLeaf', origLeafDesc));
+            }
             
             this.log('Command interception setup complete');
         } catch (error) {
